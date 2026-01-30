@@ -3,6 +3,7 @@ import type { SceneMap } from '@/types';
 import { supabase } from '@/lib/supabase-server';
 import { dbMapToSceneMap, sceneMapToDbMap } from '@/lib/db-mappers';
 import { hashPassword } from '@/lib/password';
+import { sendInvitationEmail } from '@/lib/invitation-email';
 
 /**
  * GET /api/maps
@@ -23,9 +24,15 @@ export async function GET() {
   }
 }
 
+function normalizeEmails(list: string[] | undefined): string[] {
+  if (!list || !Array.isArray(list)) return [];
+  return list.map((e) => e.trim().toLowerCase()).filter(Boolean);
+}
+
 /**
  * POST /api/maps
  * Create or replace maps. Body: SceneMap[] or single SceneMap.
+ * After upsert, sends invitation emails to newly added admin/collaborator emails (when RESEND_API_KEY is set).
  */
 export async function POST(request: NextRequest) {
   try {
@@ -38,6 +45,25 @@ export async function POST(request: NextRequest) {
       ...m,
       id: m.id || crypto.randomUUID(),
     }));
+
+    // Fetch existing maps (by id) to diff invited emails before upsert
+    const existingById: Record<string, { invitedAdminEmails: string[]; invitedCollaboratorEmails: string[] }> = {};
+    for (const m of maps) {
+      if (!m.id) continue;
+      const { data: existing } = await supabase
+        .from('maps')
+        .select('invited_admin_emails, invited_collaborator_emails')
+        .eq('id', m.id)
+        .single();
+      if (existing) {
+        existingById[m.id] = {
+          invitedAdminEmails: normalizeEmails((existing as { invited_admin_emails?: string[] }).invited_admin_emails),
+          invitedCollaboratorEmails: normalizeEmails((existing as { invited_collaborator_emails?: string[] }).invited_collaborator_emails),
+        };
+      } else {
+        existingById[m.id] = { invitedAdminEmails: [], invitedCollaboratorEmails: [] };
+      }
+    }
 
     const rows = maps.map((m, i) => {
       const row = sceneMapToDbMap(m);
@@ -53,6 +79,36 @@ export async function POST(request: NextRequest) {
       console.error('POST /api/maps', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
+
+    // Send invitation emails to newly added addresses (only when Resend is configured)
+    const fromEmail = process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev';
+    for (const m of maps) {
+      const prev = existingById[m.id] ?? { invitedAdminEmails: [], invitedCollaboratorEmails: [] };
+      const currentAdmins = normalizeEmails(m.invitedAdminEmails);
+      const currentCollaborators = normalizeEmails(m.invitedCollaboratorEmails);
+      const newAdminEmails = currentAdmins.filter((e) => !prev.invitedAdminEmails.includes(e));
+      const newCollaboratorEmails = currentCollaborators.filter((e) => !prev.invitedCollaboratorEmails.includes(e));
+
+      for (const to of newAdminEmails) {
+        const result = await sendInvitationEmail({
+          map: m,
+          to,
+          role: 'admin',
+          fromEmail,
+        });
+        if (!result.sent) console.error('Invitation email (admin)', to, result.error);
+      }
+      for (const to of newCollaboratorEmails) {
+        const result = await sendInvitationEmail({
+          map: m,
+          to,
+          role: 'collaborator',
+          fromEmail,
+        });
+        if (!result.sent) console.error('Invitation email (collaborator)', to, result.error);
+      }
+    }
+
     return NextResponse.json({ ok: true, count: maps.length });
   } catch (err) {
     console.error('POST /api/maps', err);

@@ -29,6 +29,11 @@ export interface DbMap {
   theme_id: string | null;
   invited_admin_emails: string[] | null;
   invited_collaborator_emails: string[] | null;
+  invitation_email_subject_admin: string | null;
+  invitation_email_body_admin: string | null;
+  invitation_email_subject_collaborator: string | null;
+  invitation_email_body_collaborator: string | null;
+  invitation_sender_name: string | null;
   node_size_scale: number | null;
   node_label_font_scale: number | null;
   created_at?: string;
@@ -102,6 +107,11 @@ export function dbMapToSceneMap(row: DbMap): SceneMap {
     themeId: row.theme_id ?? undefined,
     invitedAdminEmails: row.invited_admin_emails ?? undefined,
     invitedCollaboratorEmails: row.invited_collaborator_emails ?? undefined,
+    invitationEmailSubjectAdmin: row.invitation_email_subject_admin ?? undefined,
+    invitationEmailBodyAdmin: row.invitation_email_body_admin ?? undefined,
+    invitationEmailSubjectCollaborator: row.invitation_email_subject_collaborator ?? undefined,
+    invitationEmailBodyCollaborator: row.invitation_email_body_collaborator ?? undefined,
+    invitationSenderName: row.invitation_sender_name ?? undefined,
     nodeSizeScale: row.node_size_scale ?? undefined,
     nodeLabelFontScale: row.node_label_font_scale ?? undefined,
   };
@@ -156,6 +166,11 @@ export function sceneMapToDbMap(m: SceneMap): Omit<DbMap, 'created_at' | 'update
     theme_id: m.themeId ?? null,
     invited_admin_emails: m.invitedAdminEmails ?? null,
     invited_collaborator_emails: m.invitedCollaboratorEmails ?? null,
+    invitation_email_subject_admin: m.invitationEmailSubjectAdmin ?? null,
+    invitation_email_body_admin: m.invitationEmailBodyAdmin ?? null,
+    invitation_email_subject_collaborator: m.invitationEmailSubjectCollaborator ?? null,
+    invitation_email_body_collaborator: m.invitationEmailBodyCollaborator ?? null,
+    invitation_sender_name: m.invitationSenderName ?? null,
     node_size_scale: m.nodeSizeScale ?? null,
     node_label_font_scale: m.nodeLabelFontScale ?? null,
   };

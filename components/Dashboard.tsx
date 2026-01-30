@@ -2,7 +2,13 @@ import React, { useState, useEffect } from 'react';
 import type { User, SceneMap, MapTheme } from '../types';
 import { NodeType } from '../types';
 import { getMaps, saveMaps, copyNodesToSlug, saveNodes } from '../lib/data';
-import { Trash2, Link2, QrCode, Pencil } from 'lucide-react';
+import {
+  DEFAULT_ADMIN_SUBJECT,
+  DEFAULT_ADMIN_BODY,
+  DEFAULT_COLLABORATOR_SUBJECT,
+  DEFAULT_COLLABORATOR_BODY,
+} from '../lib/invitation-email';
+import { Trash2, Link2, QrCode, Pencil, X } from 'lucide-react';
 
 interface DashboardProps {
   onNavigate: (path: string) => void;
@@ -181,6 +187,12 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [qrMapSlug, setQrMapSlug] = useState<string | null>(null);
   const [mapToDelete, setMapToDelete] = useState<SceneMap | null>(null);
   const [logoError, setLogoError] = useState(false);
+  const [showInvitationEmailModal, setShowInvitationEmailModal] = useState(false);
+  const [invitationEmailSubjectAdmin, setInvitationEmailSubjectAdmin] = useState('');
+  const [invitationEmailBodyAdmin, setInvitationEmailBodyAdmin] = useState('');
+  const [invitationEmailSubjectCollaborator, setInvitationEmailSubjectCollaborator] = useState('');
+  const [invitationEmailBodyCollaborator, setInvitationEmailBodyCollaborator] = useState('');
+  const [invitationSenderName, setInvitationSenderName] = useState('');
 
   const copyMapLink = (map: SceneMap) => {
     if (typeof window === 'undefined') return;
@@ -205,6 +217,11 @@ const Dashboard: React.FC<DashboardProps> = ({
       setCollaboratorPassword('');
       setInvitedAdmins('');
       setInvitedCollaborators('');
+      setInvitationEmailSubjectAdmin('');
+      setInvitationEmailBodyAdmin('');
+      setInvitationEmailSubjectCollaborator('');
+      setInvitationEmailBodyCollaborator('');
+      setInvitationSenderName('');
       setBackgroundFile(null);
     }
     setMapToDelete(null);
@@ -248,6 +265,11 @@ const Dashboard: React.FC<DashboardProps> = ({
     setCollaboratorPassword(match.collaboratorPassword || '');
     setInvitedAdmins((match.invitedAdminEmails || []).join(', '));
     setInvitedCollaborators((match.invitedCollaboratorEmails || []).join(', '));
+    setInvitationEmailSubjectAdmin(match.invitationEmailSubjectAdmin ?? '');
+    setInvitationEmailBodyAdmin(match.invitationEmailBodyAdmin ?? '');
+    setInvitationEmailSubjectCollaborator(match.invitationEmailSubjectCollaborator ?? '');
+    setInvitationEmailBodyCollaborator(match.invitationEmailBodyCollaborator ?? '');
+    setInvitationSenderName(match.invitationSenderName ?? '');
     setBackgroundFile(null);
     setBackgroundError(null);
     setMapError(null);
@@ -397,6 +419,11 @@ const Dashboard: React.FC<DashboardProps> = ({
       themeId: selectedThemeId === baseThemeId ? selectedPreset.id : 'custom',
       invitedAdminEmails: parseEmails(invitedAdmins),
       invitedCollaboratorEmails: parseEmails(invitedCollaborators),
+      invitationEmailSubjectAdmin: invitationEmailSubjectAdmin.trim() || undefined,
+      invitationEmailBodyAdmin: invitationEmailBodyAdmin.trim() || undefined,
+      invitationEmailSubjectCollaborator: invitationEmailSubjectCollaborator.trim() || undefined,
+      invitationEmailBodyCollaborator: invitationEmailBodyCollaborator.trim() || undefined,
+      invitationSenderName: invitationSenderName.trim() || undefined,
       enabledNodeTypes: enabledNodeTypes.length < 4 ? enabledNodeTypes : undefined,
       connectionsEnabled: connectionsEnabled ? undefined : false,
     };
@@ -455,6 +482,11 @@ const Dashboard: React.FC<DashboardProps> = ({
     setCollaboratorPassword('');
     setInvitedAdmins('');
     setInvitedCollaborators('');
+    setInvitationEmailSubjectAdmin('');
+    setInvitationEmailBodyAdmin('');
+    setInvitationEmailSubjectCollaborator('');
+    setInvitationEmailBodyCollaborator('');
+    setInvitationSenderName('');
     setBackgroundFile(null);
     setEditingMapId(null);
     setEditingOriginalSlug(null);
@@ -880,6 +912,15 @@ const Dashboard: React.FC<DashboardProps> = ({
                         value={invitedCollaborators}
                         onChange={(e) => setInvitedCollaborators(e.target.value)}
                       />
+                      <p className="text-[10px] text-emerald-700">
+                        <button
+                          type="button"
+                          onClick={() => setShowInvitationEmailModal(true)}
+                          className="underline hover:text-emerald-900 font-medium"
+                        >
+                          Edit invitation email
+                        </button>
+                      </p>
                     </div>
 
                     {mapError && (
@@ -1132,6 +1173,121 @@ const Dashboard: React.FC<DashboardProps> = ({
                   className="px-4 py-2 rounded-xl text-xs font-semibold bg-rose-600 text-white hover:bg-rose-700"
                 >
                   Delete map
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit invitation email modal */}
+      {showInvitationEmailModal && (
+        <div
+          className="fixed inset-0 z-[65] flex items-center justify-center p-4 bg-emerald-950/30 backdrop-blur-sm"
+          onClick={() => setShowInvitationEmailModal(false)}
+        >
+          <div
+            className="glass w-full max-w-2xl max-h-[90vh] rounded-3xl solarpunk-shadow overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-5 border-b border-emerald-100 bg-white/60 flex justify-between items-center shrink-0">
+              <h2 className="text-lg font-bold text-emerald-950">Edit invitation email</h2>
+              <button
+                type="button"
+                onClick={() => setShowInvitationEmailModal(false)}
+                className="p-2 rounded-full hover:bg-emerald-100 text-emerald-800"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 space-y-6 overflow-y-auto bg-white/40">
+              <p className="text-[11px] text-emerald-700">
+                Customize the subject and body for admin and collaborator invitations. Use{' '}
+                <code className="bg-emerald-100 px-1 rounded text-[10px]">{'{Map title}'}</code>,{' '}
+                <code className="bg-emerald-100 px-1 rounded text-[10px]">{'{origin}'}</code>, and{' '}
+                <code className="bg-emerald-100 px-1 rounded text-[10px]">{'{slug}'}</code> as
+                placeholders; they are replaced when the email is sent.
+              </p>
+
+              <div className="space-y-3">
+                <h3 className="text-sm font-bold text-emerald-900">Admin invitation</h3>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-semibold text-emerald-800">Subject</label>
+                  <input
+                    type="text"
+                    className="w-full bg-white/80 border border-emerald-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-400"
+                    placeholder={DEFAULT_ADMIN_SUBJECT}
+                    value={invitationEmailSubjectAdmin}
+                    onChange={(e) => setInvitationEmailSubjectAdmin(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-semibold text-emerald-800">Body</label>
+                  <textarea
+                    className="w-full bg-white/80 border border-emerald-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-400 min-h-[140px] resize-y"
+                    placeholder={DEFAULT_ADMIN_BODY}
+                    value={invitationEmailBodyAdmin}
+                    onChange={(e) => setInvitationEmailBodyAdmin(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <h3 className="text-sm font-bold text-emerald-900">Collaborator invitation</h3>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-semibold text-emerald-800">Subject</label>
+                  <input
+                    type="text"
+                    className="w-full bg-white/80 border border-emerald-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-400"
+                    placeholder={DEFAULT_COLLABORATOR_SUBJECT}
+                    value={invitationEmailSubjectCollaborator}
+                    onChange={(e) => setInvitationEmailSubjectCollaborator(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-semibold text-emerald-800">Body</label>
+                  <textarea
+                    className="w-full bg-white/80 border border-emerald-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-400 min-h-[140px] resize-y"
+                    placeholder={DEFAULT_COLLABORATOR_BODY}
+                    value={invitationEmailBodyCollaborator}
+                    onChange={(e) => setInvitationEmailBodyCollaborator(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[11px] font-semibold text-emerald-800">
+                  Sender display name
+                  <span className="ml-1 font-normal text-emerald-700">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  className="w-full bg-white/80 border border-emerald-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-400"
+                  placeholder="Scene Mapper"
+                  value={invitationSenderName}
+                  onChange={(e) => setInvitationSenderName(e.target.value)}
+                />
+                <p className="text-[10px] text-emerald-700">
+                  The from-address stays your app email for deliverability; only the display name
+                  can be customized (e.g. &quot;Toronto Scene&quot;).
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowInvitationEmailModal(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-emerald-800 hover:bg-emerald-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowInvitationEmailModal(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700"
+                >
+                  Done
                 </button>
               </div>
             </div>

@@ -104,6 +104,19 @@ export interface SceneMap {
   invitedAdminEmails?: string[];
   invitedCollaboratorEmails?: string[];
   /**
+   * Optional custom invitation email subject/body (admin and collaborator).
+   * When absent, server uses defaults from docs.
+   */
+  invitationEmailSubjectAdmin?: string;
+  invitationEmailBodyAdmin?: string;
+  invitationEmailSubjectCollaborator?: string;
+  invitationEmailBodyCollaborator?: string;
+  /**
+   * Optional "From" display name for invitation emails (e.g. "Toronto Scene").
+   * The from-address stays app-configured for deliverability.
+   */
+  invitationSenderName?: string;
+  /**
    * Admin-set display options; persisted so all viewers see the same.
    * Default 1 when absent.
    */

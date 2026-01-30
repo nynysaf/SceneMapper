@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { NodeType, MapNode, MapTheme } from '../types';
-import { Filter, X, ExternalLink, Calendar, MapPin, User, Building, Leaf, Globe, Pencil, Trash2, Settings2, Link2, QrCode } from 'lucide-react';
+import { Filter, X, ExternalLink, Calendar, MapPin, User, Building, Leaf, Globe, Pencil, Trash2, Settings2, Link2, QrCode, Download } from 'lucide-react';
 
 /** Squiggly/curved line icon for connection filter (20px, matches other filter icons). */
 function ConnectionLineIcon({ size = 20, className }: { size?: number; className?: string }) {
@@ -44,6 +44,8 @@ interface SidebarProps {
   onNodeLabelFontScaleChange?: (value: number) => void;
   /** Called when the sidebar is collapsed or expanded (so parent can adjust FAB position). */
   onCollapsedChange?: (collapsed: boolean) => void;
+  /** When set, shows Download in Share section; called with chosen format when user picks one. */
+  onDownloadRequested?: (format: 'jpeg' | 'png' | 'pdf') => void;
 }
 
 function Sidebar({
@@ -70,9 +72,11 @@ function Sidebar({
   regionFontScale = 1,
   onRegionFontScaleChange,
   onCollapsedChange,
+  onDownloadRequested,
 }: SidebarProps) {
   const categoryColors = mapTheme?.categoryColors;
   const [isCollapsed, setIsCollapsed] = React.useState(false);
+  const [showDownloadModal, setShowDownloadModal] = React.useState(false);
   React.useEffect(() => {
     onCollapsedChange?.(isCollapsed);
   }, [isCollapsed, onCollapsedChange]);
@@ -363,7 +367,7 @@ function Sidebar({
             {mounted && mapSlug && shareUrl && (
               <div className="space-y-2">
                 <h3 className="text-sm font-bold text-emerald-900">Share</h3>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
                     onClick={copyShareLink}
@@ -380,6 +384,16 @@ function Sidebar({
                     <QrCode size={16} />
                     QR code
                   </button>
+                  {onDownloadRequested && (
+                    <button
+                      type="button"
+                      onClick={() => setShowDownloadModal(true)}
+                      className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium bg-white/70 text-emerald-800 hover:bg-emerald-50 border border-emerald-100"
+                    >
+                      <Download size={16} />
+                      Download
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -422,6 +436,59 @@ function Sidebar({
             className="text-sm font-medium text-emerald-800 px-4 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100"
           >
             Close
+          </button>
+        </div>
+      </div>
+    )}
+
+    {showDownloadModal && onDownloadRequested && (
+      <div
+        className="fixed inset-0 z-[70] flex items-center justify-center bg-emerald-950/40 backdrop-blur-sm pointer-events-auto"
+        onClick={() => setShowDownloadModal(false)}
+      >
+        <div
+          className="bg-white rounded-2xl p-5 shadow-xl flex flex-col items-stretch gap-3 min-w-[200px]"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <p className="text-sm font-semibold text-emerald-900">Download map as</p>
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                onDownloadRequested('png');
+                setShowDownloadModal(false);
+              }}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-100"
+            >
+              PNG
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onDownloadRequested('jpeg');
+                setShowDownloadModal(false);
+              }}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-100"
+            >
+              JPEG
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onDownloadRequested('pdf');
+                setShowDownloadModal(false);
+              }}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-100"
+            >
+              PDF
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowDownloadModal(false)}
+            className="text-sm font-medium text-emerald-700 px-4 py-2 rounded-xl hover:bg-emerald-50 mt-1"
+          >
+            Cancel
           </button>
         </div>
       </div>

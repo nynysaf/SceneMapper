@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { MapNode, MapConnection, NodeType, UserSession, MapTheme, SceneMap, User, AuthSession } from '../types';
 import { INITIAL_NODES, CATEGORY_COLORS } from '../constants';
 import { getNodes as loadNodes, saveNodes as persistNodes, getConnections as loadConnections, saveConnections as persistConnections, getUsers, getSession, getMaps, getMapBySlug, saveMaps } from '../lib/data';
@@ -8,6 +8,8 @@ import SubmissionModal from './SubmissionModal';
 import NodePopup from './NodePopup';
 import AdminReviewModal from './AdminReviewModal';
 import { Plus, Info, Users, ShieldCheck, MapPin, Inbox, X } from 'lucide-react';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 
 interface MapExperienceProps {
   /**
@@ -89,6 +91,25 @@ const MapExperience: React.FC<MapExperienceProps> = ({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [enabledNodeTypes, setEnabledNodeTypes] = useState<NodeType[]>(() => Object.values(NodeType));
   const [connectionsEnabled, setConnectionsEnabled] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportFormat, setExportFormat] = useState<'jpeg' | 'png' | 'pdf' | null>(null);
+  const mapCaptureRef = useRef<HTMLDivElement | null>(null);
+  const [backgroundImageSize, setBackgroundImageSize] = useState<{ width: number; height: number } | null>(null);
+
+  // Resolve background image dimensions for export (use when present, else default 1000x1000)
+  useEffect(() => {
+    if (!mapBackgroundImageUrl) {
+      setBackgroundImageSize(null);
+      return;
+    }
+    const img = new Image();
+    img.onload = () => {
+      setBackgroundImageSize({ width: img.naturalWidth, height: img.naturalHeight });
+    };
+    img.onerror = () => setBackgroundImageSize(null);
+    img.crossOrigin = 'anonymous';
+    img.src = mapBackgroundImageUrl;
+  }, [mapBackgroundImageUrl]);
 
   // Load map display settings (node size / font scale / enabled types) so all viewers see the same
   useEffect(() => {
@@ -375,6 +396,20 @@ const MapExperience: React.FC<MapExperienceProps> = ({
     return passFilter && isVisible;
   });
 
+  // All nodes/connections to show in export (no type filter; approved + own pending)
+  const exportNodes = nodes.filter((n) => {
+    if (!enabledNodeTypes.includes(n.type)) return false;
+    const isApproved = n.status === 'approved';
+    const isAdmin = userSession.role === 'admin';
+    const isCollaboratorOwner =
+      userSession.role === 'collaborator' && n.collaboratorId === userSession.name;
+    const isPublicOwnerPending =
+      userSession.role === 'public' &&
+      n.status === 'pending' &&
+      n.collaboratorId === userSession.name;
+    return isApproved || isAdmin || isCollaboratorOwner || isPublicOwnerPending;
+  });
+
   // Auto-open admin review modal when an admin lands on a map with pending nodes,
   // and close it automatically once the queue is empty.
   useEffect(() => {
@@ -389,6 +424,94 @@ const MapExperience: React.FC<MapExperienceProps> = ({
 
   const canShowJoin =
     hasCollaboratorPassword && userSession.role === 'public' && !!userSession.id && !!mapSlug;
+
+  // When user picks a download format: show full map (export mode) then capture and download
+  const handleDownloadRequested = useCallback((format: 'jpeg' | 'png' | 'pdf') => {
+    setIsExporting(true);
+    setExportFormat(format);
+  }, []);
+
+  useEffect(() => {
+    if (!isExporting || !exportFormat) return;
+
+    const runCapture = () => {
+      const el = mapCaptureRef.current;
+      if (!el) {
+        setIsExporting(false);
+        setExportFormat(null);
+        return;
+      }
+
+      const now = new Date();
+      const dateStr = now.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+      const dateForFilename = now.toISOString().slice(0, 10); // YYYY-MM-DD
+      const safeTitle = (mapTitle || 'Map').replace(/[\s\\/:*?"<>|]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || 'map';
+
+      html2canvas(el, {
+        scale: 1,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#fdfcf0',
+        logging: false,
+      })
+        .then((canvas) => {
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            const title = mapTitle || 'Map';
+            const padding = 24;
+            const titleX = canvas.width - padding;
+            const titleY = 36;
+            const dateY = 56;
+            ctx.textAlign = 'right';
+            ctx.fillStyle = 'rgba(0,0,0,0.75)';
+            ctx.font = 'bold 22px system-ui, sans-serif';
+            ctx.fillText(title, titleX, titleY);
+            ctx.font = '12px system-ui, sans-serif';
+            ctx.fillText(dateStr, titleX, dateY);
+          }
+
+          const ext = exportFormat === 'pdf' ? 'pdf' : exportFormat;
+          const filename = `${safeTitle}_${dateForFilename}.${ext}`;
+
+          if (exportFormat === 'pdf') {
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF({
+              orientation: 'square',
+              unit: 'px',
+              format: [canvas.width, canvas.height],
+            });
+            pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+            pdf.save(filename);
+          } else {
+            canvas.toBlob(
+              (blob) => {
+                if (!blob) return;
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                a.click();
+                URL.revokeObjectURL(url);
+              },
+              exportFormat === 'jpeg' ? 'image/jpeg' : 'image/png',
+              0.95
+            );
+          }
+        })
+        .catch(() => {})
+        .finally(() => {
+          setIsExporting(false);
+          setExportFormat(null);
+        });
+    };
+
+    const t = setTimeout(runCapture, 350);
+    return () => clearTimeout(t);
+  }, [isExporting, exportFormat, mapTitle]);
 
   const handleJoinCollaborator = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -624,6 +747,46 @@ const MapExperience: React.FC<MapExperienceProps> = ({
         </div>
       )}
 
+      {/* Off-screen map used only for export capture (full nodes, identity transform) */}
+      {isExporting && (() => {
+        const exportW = backgroundImageSize?.width ?? 1000;
+        const exportH = backgroundImageSize?.height ?? 1000;
+        return (
+        <div
+          ref={mapCaptureRef}
+          style={{
+            position: 'fixed',
+            left: '-9999px',
+            top: 0,
+            width: exportW,
+            height: exportH,
+            zIndex: -1,
+          }}
+        >
+          <Map
+            nodes={exportNodes}
+            onNodeMove={() => {}}
+            onNodeSelect={() => {}}
+            isEditable={false}
+            backgroundImageUrl={mapBackgroundImageUrl}
+            mapSlug={effectiveSlug}
+            categoryColors={categoryColors}
+            nodeSizeScale={nodeSizeScale}
+            nodeLabelFontScale={nodeLabelFontScale}
+            regionFontScale={regionFontScale}
+            connections={connectionsEnabled ? connections : []}
+            connectionLineStyle={
+              mapTheme?.connectionLine ??
+              (mapTheme
+                ? { color: mapTheme.primaryColor, opacity: 0.6, thickness: 2 }
+                : undefined)
+            }
+            exportMode
+          />
+        </div>
+        );
+      })()}
+
       {/* --- Main Map Area --- */}
       <main className={`flex-1 relative bg-[#e0f2f1] ${pendingNode ? 'cursor-crosshair' : ''}`}>
         <Map
@@ -738,6 +901,7 @@ const MapExperience: React.FC<MapExperienceProps> = ({
             : undefined
         }
         onCollapsedChange={setSidebarCollapsed}
+        onDownloadRequested={mapSlug ? handleDownloadRequested : undefined}
       />
 
       {/* Modals */}

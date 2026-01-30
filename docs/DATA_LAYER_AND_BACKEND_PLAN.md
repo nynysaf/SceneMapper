@@ -211,8 +211,12 @@ Implement every existing data-layer function against the API (e.g. `getMaps()` �
 
 ## Phase 6: Deployment
 
-- [ ] **Vercel:** Connect repo, set env vars (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_USE_BACKEND=true`, `NEXT_PUBLIC_APP_URL`).
-- [ ] **Supabase:** Production project (or same project) with same schema; point Vercel env to it.
+**Full order:** [DEPLOYMENT_SEQUENCE.md](./DEPLOYMENT_SEQUENCE.md) (GitHub → Supabase → Vercel → optional domain → Resend).
+- [ ] **Step 1 (GitHub):** Commit and push all latest code.
+- [ ] **Step 2 (Supabase):** Run all migrations (initial_schema, connections, invitation_emails).
+- [ ] **Step 3 (Vercel):** Import repo, set env vars; deploy (free *.vercel.app URL).
+- [ ] **Step 4 (optional) Domain:** Buy domain and add in Vercel when wanted.
+- [ ] **Step 5 (Resend):** Add RESEND_API_KEY and RESEND_FROM_EMAIL in Vercel; test invitations.
 - [ ] Remove or hide “local only” mode in production (e.g. `NEXT_PUBLIC_USE_BACKEND=true` always in prod).
 - [ ] Smoke test on deployed URL: signup, create map, add node, view map.
 

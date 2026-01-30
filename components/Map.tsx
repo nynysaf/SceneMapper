@@ -101,6 +101,10 @@ interface MapProps {
    * Passes connectionId and new control point in 0–100 space.
    */
   onConnectionCurveChange?: (connectionId: string, curveOffsetX: number, curveOffsetY: number) => void;
+  /**
+   * When true, the map is being captured for export: zoom is disabled and transform is identity.
+   */
+  exportMode?: boolean;
 }
 
 /**
@@ -128,6 +132,7 @@ const Map: React.FC<MapProps> = ({
   connectionLineStyle,
   currentUserName,
   onConnectionCurveChange,
+  exportMode = false,
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const dragStartRef = useRef({ x: 0, y: 0 });
@@ -155,15 +160,17 @@ const Map: React.FC<MapProps> = ({
     container.selectAll('.connection-layer').remove();
     container.selectAll('.node-group').remove();
 
-    // Setup Zoom behavior
+    // Setup Zoom behavior (disabled in export mode so transform stays identity)
     const zoom = d3.zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.5, 5])
       .on('zoom', (event) => {
         container.attr('transform', event.transform);
       });
 
-    // Toggle zoom interaction based on placement state
-    if (!isPlacing) {
+    if (exportMode) {
+      container.attr('transform', 'translate(0,0) scale(1)');
+      svg.on('.zoom', null);
+    } else if (!isPlacing) {
       svg.call(zoom);
     } else {
       svg.on('.zoom', null); // Disable zoom while placing to allow precise clicks
@@ -382,7 +389,7 @@ const Map: React.FC<MapProps> = ({
       }
     });
 
-  }, [nodes, connections, currentUserName, lineStyle, onNodeMove, onNodeSelect, onMapClick, isEditable, isPlacing, nodeSizeScale, nodeLabelFontScale, regionFontScale, categoryColors, onConnectionCurveChange]);
+  }, [nodes, connections, currentUserName, lineStyle, onNodeMove, onNodeSelect, onMapClick, isEditable, isPlacing, nodeSizeScale, nodeLabelFontScale, regionFontScale, categoryColors, onConnectionCurveChange, exportMode]);
 
   return (
     <svg 
