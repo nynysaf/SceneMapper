@@ -44,5 +44,6 @@ export const CATEGORY_COLORS: Record<NodeType, string> = {
   [NodeType.EVENT]: '#E67E22', // Terra Cotta
   [NodeType.PERSON]: '#F1C40F', // Sun Gold
   [NodeType.SPACE]: '#8BA888', // Sage Green
-  [NodeType.COMMUNITY]: '#3498DB' // Sky Blue
+  [NodeType.COMMUNITY]: '#3498DB', // Sky Blue
+  [NodeType.REGION]: '#4a5568', // Slate (text only, no dot)
 };

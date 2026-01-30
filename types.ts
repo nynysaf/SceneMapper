@@ -4,6 +4,7 @@ export enum NodeType {
   PERSON = 'PERSON',
   SPACE = 'SPACE',
   COMMUNITY = 'COMMUNITY',
+  REGION = 'REGION',
 }
 
 export interface MapNode {
@@ -18,6 +19,25 @@ export interface MapNode {
   primaryTag: string;
   collaboratorId: string;
   status: 'pending' | 'approved';
+}
+
+/**
+ * A connection between two nodes on a map.
+ * Rendered as a curved line; curve shape can be adjusted via curveOffsetX/Y.
+ */
+export interface MapConnection {
+  id: string;
+  fromNodeId: string;
+  toNodeId: string;
+  description: string;
+  collaboratorId: string;
+  status: 'pending' | 'approved';
+  /**
+   * Optional control point offset for quadratic Bezier (0–100).
+   * When absent, a default curve (e.g. midpoint) is used.
+   */
+  curveOffsetX?: number;
+  curveOffsetY?: number;
 }
 
 /**
@@ -43,6 +63,15 @@ export interface MapTheme {
    * appear on the canvas.
    */
   categoryColors?: Partial<Record<NodeType, string>>;
+  /**
+   * Optional style for connection lines (node-to-node).
+   * When absent, use theme primaryColor, 0.6 opacity, 2px thickness.
+   */
+  connectionLine?: {
+    color: string;
+    opacity: number;
+    thickness: number;
+  };
 }
 
 /**
@@ -80,6 +109,18 @@ export interface SceneMap {
    */
   nodeSizeScale?: number;
   nodeLabelFontScale?: number;
+  /**
+   * Scale factor for region label font size (REGION nodes only). Default 1 when absent.
+   */
+  regionFontScale?: number;
+  /**
+   * Node types shown on the map and available in filter/add. When absent, all five types are enabled.
+   */
+  enabledNodeTypes?: NodeType[];
+  /**
+   * Whether connections are shown and available. Default true when absent.
+   */
+  connectionsEnabled?: boolean;
 }
 
 /**

@@ -51,7 +51,7 @@ const NodePopup: React.FC<NodePopupProps> = ({
               }}
             />
             <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-800">
-              {node.type} • {node.primaryTag || node.tags[0] || 'Unsorted'}
+              {node.type}
             </span>
             {node.status === 'pending' && (
               <span className="ml-2 px-2 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-widest bg-amber-50 text-amber-800 border border-amber-200">

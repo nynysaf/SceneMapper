@@ -1,7 +1,52 @@
-
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useMemo } from 'react';
 import * as d3 from 'd3';
-import { MapNode, NodeType } from '../types';
+import { MapNode, MapConnection, NodeType } from '../types';
+
+/** Seeded PRNG (mulberry32) so the same map slug always produces the same landmass. */
+function seedFromString(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) {
+    h = Math.imul(31, h) + s.charCodeAt(i) | 0;
+  }
+  return h >>> 0;
+}
+function mulberry32(seed: number): () => number {
+  return function () {
+    let t = (seed += 0x6d2b79f5);
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Generate a random blob path (pale landmass) for the default map. Same seed => same shape. */
+function generateLandmassPath(seedString: string): string {
+  const seed = seedFromString(seedString);
+  const rnd = mulberry32(seed);
+  const cx = 500;
+  const cy = 500;
+  const rx = 320 + rnd() * 80;
+  const ry = 260 + rnd() * 60;
+  const n = 14 + Math.floor(rnd() * 6);
+  const points: [number, number][] = [];
+  for (let i = 0; i < n; i++) {
+    const angle = (i / n) * 2 * Math.PI + (rnd() - 0.5) * 0.5;
+    const r = 0.85 + rnd() * 0.3;
+    points.push([
+      cx + Math.cos(angle) * rx * r + (rnd() - 0.5) * 40,
+      cy + Math.sin(angle) * ry * r + (rnd() - 0.5) * 40,
+    ]);
+  }
+  const line = d3.line().curve(d3.curveCatmullRomClosed).x((d) => d[0]).y((d) => d[1]);
+  return line(points) ?? '';
+}
+
+/** Style for connection lines (from MapTheme.connectionLine). */
+export interface ConnectionLineStyle {
+  color: string;
+  opacity: number;
+  thickness: number;
+}
 
 interface MapProps {
   nodes: MapNode[];
@@ -15,6 +60,11 @@ interface MapProps {
    * When provided, it is rendered underneath all nodes.
    */
   backgroundImageUrl?: string;
+  /**
+   * Map slug (or any stable id) used to seed the default landmass shape when no background image.
+   * Each map gets a different but stable random blob.
+   */
+  mapSlug?: string;
   /**
    * Per-category colors, usually derived from the active MapTheme.
    * Falls back to a sane default palette when not provided.
@@ -30,6 +80,27 @@ interface MapProps {
    * Admin only.
    */
   nodeLabelFontScale?: number;
+  /**
+   * Scale factor for region label font size (REGION nodes only). 1 = default. Does not affect other node labels.
+   */
+  regionFontScale?: number;
+  /**
+   * Approved connections to draw as curved lines between nodes.
+   */
+  connections?: MapConnection[];
+  /**
+   * Style for connection lines. When absent, use theme primary color, 0.6 opacity, 2px.
+   */
+  connectionLineStyle?: ConnectionLineStyle;
+  /**
+   * Current user name; pending connections with this collaboratorId are drawn at 40% opacity.
+   */
+  currentUserName?: string;
+  /**
+   * Called when collaborator/admin drags a connection line to adjust its curve.
+   * Passes connectionId and new control point in 0–100 space.
+   */
+  onConnectionCurveChange?: (connectionId: string, curveOffsetX: number, curveOffsetY: number) => void;
 }
 
 /**
@@ -38,6 +109,8 @@ interface MapProps {
  * Uses D3.js to render a zoomable, draggable SVG canvas.
  * Handles both spatial data visualization and coordinate selection for new entries.
  */
+const SCALE = 10; // node x,y are 0–100; SVG coords are x*SCALE, y*SCALE (0–1000)
+
 const Map: React.FC<MapProps> = ({
   nodes,
   onNodeMove,
@@ -46,22 +119,40 @@ const Map: React.FC<MapProps> = ({
   isEditable,
   isPlacing,
   backgroundImageUrl,
+  mapSlug,
   categoryColors,
   nodeSizeScale = 1,
   nodeLabelFontScale = 1,
+  regionFontScale = 1,
+  connections = [],
+  connectionLineStyle,
+  currentUserName,
+  onConnectionCurveChange,
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const dragStartRef = useRef({ x: 0, y: 0 });
   const dragJustEndedRef = useRef(false); // kept for backwards compat with any cached bundles; unused
   const DRAG_THRESHOLD_SQ = 25; // 5px movement = real drag (below = treat as click)
 
+  const lineStyle = connectionLineStyle ?? {
+    color: '#059669',
+    opacity: 0.6,
+    thickness: 2,
+  };
+
+  const defaultLandmassPath = useMemo(
+    () => generateLandmassPath(mapSlug ?? 'default'),
+    [mapSlug],
+  );
+
   useEffect(() => {
     if (!svgRef.current) return;
 
     const svg = d3.select(svgRef.current);
     const container = svg.select('.map-content');
-    
-    // Cleanup previous renders to ensure fresh D3 binding
+
+    // Cleanup previous renders
+    container.selectAll('.connection-layer').remove();
     container.selectAll('.node-group').remove();
 
     // Setup Zoom behavior
@@ -78,6 +169,96 @@ const Map: React.FC<MapProps> = ({
       svg.on('.zoom', null); // Disable zoom while placing to allow precise clicks
     }
 
+    // --- Connection lines (above background, under nodes) ---
+    // (Use plain object to avoid shadowing built-in Map constructor)
+    const nodeById: Record<string, MapNode> = Object.fromEntries(nodes.map((n) => [n.id, n]));
+    const connectionsToDraw = connections.filter((c) => {
+      if (c.status === 'approved') return true;
+      if (c.status === 'pending' && currentUserName && c.collaboratorId === currentUserName) return true;
+      return false;
+    });
+    if (connectionsToDraw.length > 0) {
+      const connectionLayer = container.append('g').attr('class', 'connection-layer');
+      const canEditCurve = isEditable && !isPlacing && !!onConnectionCurveChange;
+      connectionsToDraw.forEach((conn) => {
+        const fromNode = nodeById[conn.fromNodeId];
+        const toNode = nodeById[conn.toNodeId];
+        if (!fromNode || !toNode) return;
+        const x1 = fromNode.x * SCALE;
+        const y1 = fromNode.y * SCALE;
+        const x2 = toNode.x * SCALE;
+        const y2 = toNode.y * SCALE;
+        let cpx: number;
+        let cpy: number;
+        if (conn.curveOffsetX != null && conn.curveOffsetY != null) {
+          cpx = conn.curveOffsetX * SCALE;
+          cpy = conn.curveOffsetY * SCALE;
+        } else {
+          // Default: offset control point perpendicular to the segment so the line curves
+          const dx = toNode.x - fromNode.x;
+          const dy = toNode.y - fromNode.y;
+          const len = Math.hypot(dx, dy) || 1;
+          const midX = (fromNode.x + toNode.x) / 2;
+          const midY = (fromNode.y + toNode.y) / 2;
+          const bulge = 0.15 * len; // curve strength (15% of segment length)
+          const perpX = (-dy / len) * bulge;
+          const perpY = (dx / len) * bulge;
+          cpx = (midX + perpX) * SCALE;
+          cpy = (midY + perpY) * SCALE;
+        }
+        let cpxCur = cpx;
+        let cpyCur = cpy;
+        const pathD = () => `M ${x1} ${y1} Q ${cpxCur} ${cpyCur} ${x2} ${y2}`;
+        const isPending = conn.status === 'pending';
+        const strokeOpacity = isPending ? 0.4 : lineStyle.opacity;
+        const group = connectionLayer.append('g').attr('class', 'connection-group');
+        group
+          .append('path')
+          .attr('d', pathD())
+          .attr('fill', 'none')
+          .attr('stroke', lineStyle.color)
+          .attr('stroke-opacity', strokeOpacity)
+          .attr('stroke-width', lineStyle.thickness)
+          .attr('stroke-linecap', 'round');
+        if (canEditCurve && conn.status === 'approved') {
+          const hitPath = group
+            .append('path')
+            .attr('d', pathD())
+            .attr('fill', 'none')
+            .attr('stroke', 'transparent')
+            .attr('stroke-width', 20)
+            .attr('stroke-linecap', 'round')
+            .style('cursor', 'grab')
+            .style('pointer-events', 'stroke');
+          const updatePaths = () => {
+            const d = pathD();
+            group.selectAll('path').attr('d', d);
+          };
+          const connectionDrag = d3
+            .drag<SVGPathElement, unknown>()
+            .subject(function () {
+              return { x: cpxCur, y: cpyCur };
+            })
+            .on('start', function (event) {
+              event.sourceEvent.stopPropagation();
+              d3.select(this).style('cursor', 'grabbing');
+            })
+            .on('drag', function (event) {
+              cpxCur = Math.max(0, Math.min(1000, event.x));
+              cpyCur = Math.max(0, Math.min(1000, event.y));
+              updatePaths();
+            })
+            .on('end', function () {
+              d3.select(this).style('cursor', 'grab');
+              const curveX = Math.max(0, Math.min(100, cpxCur / SCALE));
+              const curveY = Math.max(0, Math.min(100, cpyCur / SCALE));
+              onConnectionCurveChange!(conn.id, curveX, curveY);
+            });
+          hitPath.call(connectionDrag as any);
+        }
+      });
+    }
+
     // --- Node Rendering ---
     const nodeGroups = container
       .selectAll<SVGGElement, MapNode>('.node-group')
@@ -85,43 +266,48 @@ const Map: React.FC<MapProps> = ({
       .enter()
       .append('g')
       .attr('class', 'node-group cursor-pointer')
-      .attr('transform', (d) => `translate(${d.x * 10}, ${d.y * 10})`)
+      .attr('transform', (d) => `translate(${d.x * SCALE}, ${d.y * SCALE})`)
       .attr('opacity', (d) => (d.status === 'pending' ? 0.8 : 1));
 
     const rGlow = 16 * nodeSizeScale;
     const rMain = 10 * nodeSizeScale;
     const labelDy = 25 * nodeSizeScale;
     const labelFontSize = Math.round(11 * nodeLabelFontScale);
+    const regionFontSize = Math.round(14 * regionFontScale);
 
-    // Decorative Glow
-    nodeGroups
+    // Decorative Glow (skip for REGION – no dot)
+    nodeGroups.filter((d: MapNode) => d.type !== NodeType.REGION)
       .append('circle')
       .attr('r', rGlow)
-      .attr('fill', (d) => categoryColors[d.type])
+      .attr('fill', (d: MapNode) => categoryColors[d.type])
       .attr('opacity', 0.15);
 
-    // Main Dot
-    nodeGroups
+    // Main Dot (skip for REGION)
+    nodeGroups.filter((d: MapNode) => d.type !== NodeType.REGION)
       .append('circle')
       .attr('r', rMain)
-      .attr('fill', (d) => categoryColors[d.type])
+      .attr('fill', (d: MapNode) => categoryColors[d.type])
       .attr('stroke', '#FFFFFF')
       .attr('stroke-width', 2)
-      .attr('stroke-opacity', (d) => (d.status === 'pending' ? 0.7 : 1))
+      .attr('stroke-opacity', (d: MapNode) => (d.status === 'pending' ? 0.7 : 1))
       .attr('stroke-dasharray', 'none');
 
-    // Label Rendering (With white stroke for legibility)
-    nodeGroups
-      .append('text')
-      .text((d) => d.title)
-      .attr('dy', labelDy)
-      .attr('text-anchor', 'middle')
-      .attr('class', 'font-bold fill-emerald-950 pointer-events-none uppercase tracking-wider')
-      .style('font-size', `${labelFontSize}px`)
-      .style('paint-order', 'stroke')
-      .style('stroke', '#fdfcf0')
-      .style('stroke-width', '4px')
-      .style('stroke-linecap', 'round');
+    // Label: for REGION use region font size and center; for others use label font size and offset
+    nodeGroups.each(function (d: MapNode) {
+      const g = d3.select(this);
+      const isRegion = d.type === NodeType.REGION;
+      g.append('text')
+        .text(d.title)
+        .attr('dy', isRegion ? 0 : labelDy)
+        .attr('text-anchor', 'middle')
+        .attr('class', isRegion ? 'font-semibold' : 'font-bold fill-emerald-950 pointer-events-none uppercase tracking-wider')
+        .style('font-size', isRegion ? `${regionFontSize}px` : `${labelFontSize}px`)
+        .style('fill', isRegion ? (categoryColors[d.type] ?? '#4a5568') : undefined)
+        .style('paint-order', isRegion ? undefined : 'stroke')
+        .style('stroke', isRegion ? undefined : '#fdfcf0')
+        .style('stroke-width', isRegion ? undefined : '4px')
+        .style('stroke-linecap', isRegion ? undefined : 'round');
+    });
 
     // --- Interaction Logic ---
 
@@ -129,7 +315,7 @@ const Map: React.FC<MapProps> = ({
     if (isEditable && !isPlacing) {
       const drag = d3.drag<SVGGElement, MapNode>()
         .subject((event, d) => {
-          const sub = { x: d.x * 10, y: d.y * 10 };
+          const sub = { x: d.x * SCALE, y: d.y * SCALE };
           dragStartRef.current = { x: sub.x, y: sub.y };
           return sub;
         })
@@ -158,7 +344,6 @@ const Map: React.FC<MapProps> = ({
           const dy = event.y - dragStartRef.current.y;
           if (dx * dx + dy * dy <= DRAG_THRESHOLD_SQ) {
             const group = this as SVGGElement;
-            // Use the main circle's center (not the whole group) so the popup anchors to the dot, not below it (group includes label)
             const circle = group.querySelector('circle:nth-child(2)');
             const rect = circle ? (circle as SVGCircleElement).getBoundingClientRect() : group.getBoundingClientRect();
             onNodeSelect(d, {
@@ -197,7 +382,7 @@ const Map: React.FC<MapProps> = ({
       }
     });
 
-  }, [nodes, onNodeMove, onNodeSelect, onMapClick, isEditable, isPlacing, nodeSizeScale, nodeLabelFontScale]);
+  }, [nodes, connections, currentUserName, lineStyle, onNodeMove, onNodeSelect, onMapClick, isEditable, isPlacing, nodeSizeScale, nodeLabelFontScale, regionFontScale, categoryColors, onConnectionCurveChange]);
 
   return (
     <svg 
@@ -234,50 +419,22 @@ const Map: React.FC<MapProps> = ({
           />
         ) : (
           <>
-            <rect width="1000" height="1000" fill="url(#grid)" pointerEvents="all" />
-            {/* Visual Background Elements (only when no custom image is set) */}
+            {/* Default: pale landmass surrounded by water (shape seeded by map slug) */}
+            <rect width="1000" height="1000" fill="#c5dce8" pointerEvents="all" />
             <path
-              d="M 0 850 Q 300 750, 600 900 T 1000 800 V 1000 H 0 Z"
-              fill="#AED6F1"
-              opacity="0.4"
-              pointerEvents="none"
-            />
-            <ellipse
-              cx="450"
-              cy="900"
-              rx="80"
-              ry="40"
-              fill="#8BA888"
-              opacity="0.2"
-              pointerEvents="none"
-            />
-            <ellipse
-              cx="580"
-              cy="870"
-              rx="50"
-              ry="25"
-              fill="#8BA888"
-              opacity="0.2"
+              d={defaultLandmassPath}
+              fill="#e8e6d9"
+              stroke="#d4d2c4"
+              strokeWidth="2"
+              opacity="0.95"
               pointerEvents="none"
             />
             <path
-              d="M 700 0 Q 650 400, 750 750"
-              stroke="#8BA888"
-              strokeWidth="60"
-              strokeLinecap="round"
-              fill="none"
-              opacity="0.08"
+              d={defaultLandmassPath}
+              fill="url(#grid)"
+              fillOpacity="0.12"
               pointerEvents="none"
             />
-            <text
-              x="500"
-              y="950"
-              className="text-3xl font-bold fill-blue-700 opacity-20 italic pointer-events-none"
-              textAnchor="middle"
-              style={{ fontFamily: 'Playfair Display' }}
-            >
-              Lake Ontario
-            </text>
           </>
         )}
 

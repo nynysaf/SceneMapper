@@ -2,7 +2,7 @@
  * Map between Supabase row shapes (snake_case) and app types (camelCase).
  * Used by API routes when reading/writing the database.
  */
-import type { SceneMap, MapNode, User, MapTheme } from '@/types';
+import type { SceneMap, MapNode, MapConnection, User, MapTheme } from '@/types';
 
 // --- DB row types (snake_case, matching migration) ---
 
@@ -48,6 +48,20 @@ export interface DbNode {
   primary_tag: string;
   collaborator_id: string;
   status: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface DbConnection {
+  id: string;
+  map_id: string;
+  from_node_id: string;
+  to_node_id: string;
+  description: string;
+  collaborator_id: string;
+  status: string;
+  curve_offset_x: number | null;
+  curve_offset_y: number | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -109,6 +123,19 @@ export function dbNodeToMapNode(row: DbNode): MapNode {
   };
 }
 
+export function dbConnectionToMapConnection(row: DbConnection): MapConnection {
+  return {
+    id: row.id,
+    fromNodeId: row.from_node_id,
+    toNodeId: row.to_node_id,
+    description: row.description ?? '',
+    collaboratorId: row.collaborator_id ?? '',
+    status: row.status === 'pending' ? 'pending' : 'approved',
+    curveOffsetX: row.curve_offset_x != null ? Number(row.curve_offset_x) : undefined,
+    curveOffsetY: row.curve_offset_y != null ? Number(row.curve_offset_y) : undefined,
+  };
+}
+
 // --- App -> Row (for insert/update) ---
 
 export function sceneMapToDbMap(m: SceneMap): Omit<DbMap, 'created_at' | 'updated_at'> {
@@ -148,5 +175,19 @@ export function mapNodeToDbNode(n: MapNode, mapId: string): Omit<DbNode, 'create
     primary_tag: n.primaryTag ?? '',
     collaborator_id: n.collaboratorId ?? '',
     status: n.status ?? 'approved',
+  };
+}
+
+export function mapConnectionToDbConnection(c: MapConnection, mapId: string): Omit<DbConnection, 'created_at' | 'updated_at'> {
+  return {
+    id: c.id,
+    map_id: mapId,
+    from_node_id: c.fromNodeId,
+    to_node_id: c.toNodeId,
+    description: c.description ?? '',
+    collaborator_id: c.collaboratorId ?? '',
+    status: c.status ?? 'approved',
+    curve_offset_x: c.curveOffsetX ?? null,
+    curve_offset_y: c.curveOffsetY ?? null,
   };
 }

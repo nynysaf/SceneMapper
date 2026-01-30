@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import type { User, SceneMap, MapTheme } from '../types';
 import { NodeType } from '../types';
 import { getMaps, saveMaps, copyNodesToSlug, saveNodes } from '../lib/data';
-import { Trash2, Link2, QrCode } from 'lucide-react';
+import { Trash2, Link2, QrCode, Pencil } from 'lucide-react';
 
 interface DashboardProps {
   onNavigate: (path: string) => void;
@@ -34,7 +34,9 @@ const THEME_PRESETS: { id: string; label: string; description: string; theme: Ma
         [NodeType.PERSON]: '#FACC15',
         [NodeType.SPACE]: '#34D399',
         [NodeType.COMMUNITY]: '#38BDF8',
+        [NodeType.REGION]: '#4a5568',
       },
+      connectionLine: { color: '#059669', opacity: 0.6, thickness: 2 },
     },
   },
   {
@@ -53,7 +55,9 @@ const THEME_PRESETS: { id: string; label: string; description: string; theme: Ma
         [NodeType.PERSON]: '#F97316',
         [NodeType.SPACE]: '#22C55E',
         [NodeType.COMMUNITY]: '#E5E7EB',
+        [NodeType.REGION]: '#94a3b8',
       },
+      connectionLine: { color: '#38bdf8', opacity: 0.7, thickness: 2 },
     },
   },
   {
@@ -72,7 +76,9 @@ const THEME_PRESETS: { id: string; label: string; description: string; theme: Ma
         [NodeType.PERSON]: '#7C2D12',
         [NodeType.SPACE]: '#15803D',
         [NodeType.COMMUNITY]: '#1D4ED8',
+        [NodeType.REGION]: '#4b5563',
       },
+      connectionLine: { color: '#111827', opacity: 0.6, thickness: 2 },
     },
   },
   {
@@ -91,7 +97,9 @@ const THEME_PRESETS: { id: string; label: string; description: string; theme: Ma
         [NodeType.PERSON]: '#E11D48',
         [NodeType.SPACE]: '#22C55E',
         [NodeType.COMMUNITY]: '#38BDF8',
+        [NodeType.REGION]: '#94a3b8',
       },
+      connectionLine: { color: '#14F4C9', opacity: 0.8, thickness: 2 },
     },
   },
   {
@@ -111,6 +119,7 @@ const THEME_PRESETS: { id: string; label: string; description: string; theme: Ma
         [NodeType.SPACE]: '#16A34A',
         [NodeType.COMMUNITY]: '#065F46',
       },
+      connectionLine: { color: '#166534', opacity: 0.6, thickness: 2 },
     },
   },
 ];
@@ -155,10 +164,22 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [customCommunityColor, setCustomCommunityColor] = useState<string>(
     DEFAULT_THEME.theme.categoryColors?.[NodeType.COMMUNITY] || '#3498DB',
   );
+  const [customConnectionLineColor, setCustomConnectionLineColor] = useState<string>(
+    DEFAULT_THEME.theme.connectionLine?.color ?? DEFAULT_THEME.theme.primaryColor,
+  );
+  const [customConnectionLineOpacity, setCustomConnectionLineOpacity] = useState<number>(
+    DEFAULT_THEME.theme.connectionLine?.opacity ?? 0.6,
+  );
+  const [customConnectionLineThickness, setCustomConnectionLineThickness] = useState<number>(
+    DEFAULT_THEME.theme.connectionLine?.thickness ?? 2,
+  );
   const [baseThemeId, setBaseThemeId] = useState<string>(DEFAULT_THEME.id);
+  const [enabledNodeTypes, setEnabledNodeTypes] = useState<NodeType[]>(Object.values(NodeType));
+  const [connectionsEnabled, setConnectionsEnabled] = useState(true);
   const [mapListSort, setMapListSort] = useState<'name-asc' | 'name-desc'>('name-asc');
   const [copiedMapId, setCopiedMapId] = useState<string | null>(null);
   const [qrMapSlug, setQrMapSlug] = useState<string | null>(null);
+  const [mapToDelete, setMapToDelete] = useState<SceneMap | null>(null);
   const [logoError, setLogoError] = useState(false);
 
   const copyMapLink = (map: SceneMap) => {
@@ -168,6 +189,32 @@ const Dashboard: React.FC<DashboardProps> = ({
       setCopiedMapId(map.id);
       setTimeout(() => setCopiedMapId(null), 2000);
     });
+  };
+
+  const handleConfirmDeleteMap = () => {
+    if (!mapToDelete) return;
+    const next = maps.filter((m) => m.id !== mapToDelete.id);
+    persistMaps(next);
+    if (editingMapId === mapToDelete.id) {
+      setEditingMapId(null);
+      setEditingOriginalSlug(null);
+      setMapTitle('');
+      setMapSlug('');
+      setMapDescription('');
+      setSelectedThemeId(DEFAULT_THEME.id);
+      setCollaboratorPassword('');
+      setInvitedAdmins('');
+      setInvitedCollaborators('');
+      setBackgroundFile(null);
+    }
+    setMapToDelete(null);
+  };
+
+  const roleForMap = (map: SceneMap): 'Admin' | 'Collaborator' | 'Viewed' => {
+    if (!currentUser) return 'Viewed';
+    if (map.adminIds?.includes(currentUser.id)) return 'Admin';
+    if (map.collaboratorIds?.includes(currentUser.id)) return 'Collaborator';
+    return 'Viewed';
   };
 
   const sortedMaps = React.useMemo(() => {
@@ -213,6 +260,17 @@ const Dashboard: React.FC<DashboardProps> = ({
       setCustomSpaceColor(themeToUse.categoryColors[NodeType.SPACE] || customSpaceColor);
       setCustomCommunityColor(themeToUse.categoryColors[NodeType.COMMUNITY] || customCommunityColor);
     }
+    if (themeToUse.connectionLine) {
+      setCustomConnectionLineColor(themeToUse.connectionLine.color);
+      setCustomConnectionLineOpacity(themeToUse.connectionLine.opacity);
+      setCustomConnectionLineThickness(themeToUse.connectionLine.thickness);
+    }
+    setEnabledNodeTypes(
+      match.enabledNodeTypes && match.enabledNodeTypes.length > 0
+        ? match.enabledNodeTypes
+        : Object.values(NodeType),
+    );
+    setConnectionsEnabled(match.connectionsEnabled !== false);
   }, [initialEditSlug, maps, editingMapId]);
 
   const persistMaps = (next: SceneMap[]) => {
@@ -314,6 +372,12 @@ const Dashboard: React.FC<DashboardProps> = ({
         [NodeType.PERSON]: customPersonColor,
         [NodeType.SPACE]: customSpaceColor,
         [NodeType.COMMUNITY]: customCommunityColor,
+        [NodeType.REGION]: selectedPreset.theme.categoryColors?.[NodeType.REGION] ?? '#4a5568',
+      },
+      connectionLine: {
+        color: customConnectionLineColor,
+        opacity: customConnectionLineOpacity,
+        thickness: customConnectionLineThickness,
       },
     };
 
@@ -333,6 +397,8 @@ const Dashboard: React.FC<DashboardProps> = ({
       themeId: selectedThemeId === baseThemeId ? selectedPreset.id : 'custom',
       invitedAdminEmails: parseEmails(invitedAdmins),
       invitedCollaboratorEmails: parseEmails(invitedCollaborators),
+      enabledNodeTypes: enabledNodeTypes.length < 4 ? enabledNodeTypes : undefined,
+      connectionsEnabled: connectionsEnabled ? undefined : false,
     };
 
     if (backgroundImageUrl !== undefined) {
@@ -384,6 +450,8 @@ const Dashboard: React.FC<DashboardProps> = ({
     setMapSlug('');
     setMapDescription('');
     setSelectedThemeId(DEFAULT_THEME.id);
+    setEnabledNodeTypes(Object.values(NodeType));
+    setConnectionsEnabled(true);
     setCollaboratorPassword('');
     setInvitedAdmins('');
     setInvitedCollaborators('');
@@ -447,9 +515,11 @@ const Dashboard: React.FC<DashboardProps> = ({
             {editingMapId ? 'Edit your map' : 'Map your scene, your way.'}
           </h2>
           {!editingMapId && (
-            <p className="text-sm text-emerald-800 leading-relaxed">
-              Build your map to inspire your scene. Get the vibes right and the map will find a life
-              of its own.
+            <div className="text-sm text-emerald-800 leading-relaxed">
+              <p>
+                Build your map to inspire your scene. Get the vibes right and the map will find a life
+                of its own.
+              </p>
               <ul className="list-disc list-inside space-y-2 mt-3 text-emerald-800">
                 <li>
                   Find a playful <strong>name</strong> that is recognizably &apos;your scene&apos;
@@ -465,125 +535,6 @@ const Dashboard: React.FC<DashboardProps> = ({
                   local artist or AI to create something that matches your vision.
                 </li>
               </ul>
-            </p>
-          )}
-          {currentUser && maps.length > 0 && (
-            <div className="p-4 rounded-2xl glass max-w-md space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <h4 className="text-xs font-semibold text-emerald-900 uppercase tracking-wide">
-                  YOUR MAPS
-                </h4>
-                {maps.length > 1 && (
-                  <select
-                    className="text-[10px] font-medium text-emerald-800 bg-white/70 border border-emerald-100 rounded-lg px-2 py-1 focus:outline-none focus:border-emerald-400"
-                    value={mapListSort}
-                    onChange={(e) => setMapListSort(e.target.value as 'name-asc' | 'name-desc')}
-                  >
-                    <option value="name-asc">Name A–Z</option>
-                    <option value="name-desc">Name Z–A</option>
-                  </select>
-                )}
-              </div>
-              <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-                {sortedMaps.map((map) => (
-                  <div
-                    key={map.id}
-                    className="w-full flex items-start justify-between gap-2 text-left px-3 py-2 rounded-xl bg-white/60 hover:bg-emerald-50 border border-emerald-100"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => onNavigate(`/maps/${map.slug}`)}
-                      className="flex-1 text-left"
-                    >
-                      <p className="text-xs font-semibold text-emerald-900">{map.title}</p>
-                      {map.description && (
-                        <p className="text-[10px] text-emerald-700 line-clamp-2">
-                          {map.description}
-                        </p>
-                      )}
-                      <p className="text-[10px] text-emerald-600 mt-1">
-                        /maps/{map.slug}
-                      </p>
-                    </button>
-                    <div className="flex flex-col items-end gap-1">
-                      <span
-                        className={`text-[10px] px-2 py-1 rounded-full font-semibold ${
-                          map.adminIds.includes(currentUser.id)
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : map.collaboratorIds.includes(currentUser.id)
-                              ? 'bg-amber-100 text-amber-800'
-                              : 'bg-slate-100 text-slate-600'
-                        }`}
-                      >
-                        {map.adminIds.includes(currentUser.id)
-                          ? 'Admin'
-                          : map.collaboratorIds.includes(currentUser.id)
-                            ? 'Collaborator'
-                            : 'Viewed'}
-                      </span>
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => copyMapLink(map)}
-                          className={`p-1 rounded-full ${copiedMapId === map.id ? 'text-emerald-600 bg-emerald-100' : 'text-emerald-700 hover:bg-emerald-50'}`}
-                          title={copiedMapId === map.id ? 'Copied!' : 'Copy link'}
-                        >
-                          <Link2 size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setQrMapSlug(map.slug)}
-                          className="p-1 rounded-full text-emerald-700 hover:bg-emerald-50"
-                          title="Show QR code"
-                        >
-                          <QrCode size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingMapId(map.id);
-                            setEditingOriginalSlug(map.slug);
-                            setMapTitle(map.title);
-                            setMapSlug(map.slug);
-                            setMapDescription(map.description);
-                            setSelectedThemeId(map.themeId || DEFAULT_THEME.id);
-                            setCollaboratorPassword(map.collaboratorPassword || '');
-                            setInvitedAdmins((map.invitedAdminEmails || []).join(', '));
-                            setInvitedCollaborators(
-                              (map.invitedCollaboratorEmails || []).join(', '),
-                            );
-                            setBackgroundFile(null);
-                            setBackgroundError(null);
-                            setMapError(null);
-                          }}
-                          className="text-[10px] font-semibold text-emerald-800 px-2 py-1 rounded-full hover:bg-emerald-50"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (!window.confirm(`Delete "${map.title}"? This cannot be undone.`)) return;
-                            const next = maps.filter((m) => m.id !== map.id);
-                            persistMaps(next);
-                            if (editingMapId === map.id) {
-                              setEditingMapId(null);
-                              setEditingOriginalSlug(null);
-                              setMapTitle('');
-                              setMapSlug('');
-                              setMapDescription('');
-                            }
-                          }}
-                          className="p-1 rounded-full text-rose-600 hover:bg-rose-50"
-                          title="Delete map"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
             </div>
           )}
           <p className="mt-3">
@@ -594,10 +545,8 @@ const Dashboard: React.FC<DashboardProps> = ({
               Import from browser storage →
             </a>
           </p>
-        </section>
 
-        <section className="flex-1 max-w-md space-y-4">
-          <div className="glass rounded-3xl p-6 solarpunk-shadow">
+          <div className="glass rounded-3xl p-6 solarpunk-shadow mt-6">
             {currentUser ? (
               <>
                 {/* Create / Edit map form */}
@@ -699,6 +648,12 @@ const Dashboard: React.FC<DashboardProps> = ({
                               cat[NodeType.COMMUNITY] || customCommunityColor,
                             );
                           }
+                          const conn = preset.theme.connectionLine;
+                          if (conn) {
+                            setCustomConnectionLineColor(conn.color);
+                            setCustomConnectionLineOpacity(conn.opacity);
+                            setCustomConnectionLineThickness(conn.thickness);
+                          }
                         }}
                       >
                         {THEME_PRESETS.map((preset) => (
@@ -779,6 +734,105 @@ const Dashboard: React.FC<DashboardProps> = ({
                           />
                         </div>
                       </div>
+                      <div className="mt-3 pt-3 border-t border-emerald-100 space-y-2">
+                        <label className="text-[10px] font-semibold text-emerald-900 block">
+                          Connection lines
+                        </label>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-semibold text-emerald-900">
+                              Line colour
+                            </label>
+                            <input
+                              type="color"
+                              className="h-8 w-full rounded-md border border-emerald-100 bg-white/70"
+                              value={customConnectionLineColor}
+                              onChange={(e) => {
+                                setCustomConnectionLineColor(e.target.value);
+                                if (selectedThemeId === baseThemeId) setSelectedThemeId('custom');
+                              }}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-semibold text-emerald-900">
+                              Opacity
+                            </label>
+                            <input
+                              type="range"
+                              min={0}
+                              max={1}
+                              step={0.1}
+                              className="w-full h-8"
+                              value={customConnectionLineOpacity}
+                              onChange={(e) => {
+                                setCustomConnectionLineOpacity(Number(e.target.value));
+                                if (selectedThemeId === baseThemeId) setSelectedThemeId('custom');
+                              }}
+                            />
+                            <span className="text-[10px] text-emerald-700">
+                              {Math.round(customConnectionLineOpacity * 100)}%
+                            </span>
+                          </div>
+                          <div className="space-y-1 col-span-2">
+                            <label className="text-[10px] font-semibold text-emerald-900">
+                              Thickness (px)
+                            </label>
+                            <input
+                              type="number"
+                              min={1}
+                              max={6}
+                              className="w-full bg-white/70 border border-emerald-100 rounded-xl px-3 py-2 text-sm"
+                              value={customConnectionLineThickness}
+                              onChange={(e) => {
+                                const v = Number(e.target.value);
+                                if (v >= 1 && v <= 6) {
+                                  setCustomConnectionLineThickness(v);
+                                  if (selectedThemeId === baseThemeId) setSelectedThemeId('custom');
+                                }
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[11px] font-semibold text-emerald-900 block">
+                        Show on map
+                      </label>
+                      <p className="text-[10px] text-emerald-700">
+                        Disabled types are hidden from the map, filter panel, and add-entry options.
+                      </p>
+                      <div className="flex flex-wrap gap-4">
+                        {Object.values(NodeType).map((type) => (
+                          <label
+                            key={type}
+                            className="flex items-center gap-2 cursor-pointer text-sm text-emerald-900"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={enabledNodeTypes.includes(type)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setEnabledNodeTypes((prev) => [...prev, type].sort());
+                                } else {
+                                  setEnabledNodeTypes((prev) => prev.filter((t) => t !== type));
+                                }
+                              }}
+                              className="rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
+                            />
+                            {type.charAt(0).toUpperCase() + type.slice(1).toLowerCase()}
+                          </label>
+                        ))}
+                        <label className="flex items-center gap-2 cursor-pointer text-sm text-emerald-900">
+                          <input
+                            type="checkbox"
+                            checked={connectionsEnabled}
+                            onChange={(e) => setConnectionsEnabled(e.target.checked)}
+                            className="rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
+                          />
+                          Connections
+                        </label>
+                      </div>
                     </div>
                     <div className="space-y-1">
                       <label className="text-[11px] font-semibold text-emerald-900">
@@ -838,7 +892,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                       type="submit"
                       className="w-full bg-emerald-600 text-white py-2.5 rounded-2xl font-semibold text-sm hover:bg-emerald-700 transition-colors"
                     >
-                      Create map
+                      {editingMapId ? 'Save changes' : 'Create map'}
                     </button>
                   </form>
                 </div>
@@ -935,12 +989,155 @@ const Dashboard: React.FC<DashboardProps> = ({
           </div>
           <button
             onClick={() => onNavigate('/')}
-            className="text-xs text-emerald-800 underline underline-offset-2 hover:text-emerald-900"
+            className="mt-4 text-xs text-emerald-800 underline underline-offset-2 hover:text-emerald-900"
           >
             Back to Scene Mapper landing
           </button>
         </section>
+
+        <section className="flex-1 max-w-md space-y-4">
+          {currentUser && maps.length > 0 && (
+            <div className="glass rounded-3xl p-6 solarpunk-shadow">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-xs font-semibold text-emerald-900 uppercase tracking-wide">
+                  Your maps
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setMapListSort((s) => (s === 'name-asc' ? 'name-desc' : 'name-asc'))}
+                  className="text-[10px] font-semibold text-emerald-700 hover:text-emerald-900"
+                >
+                  {mapListSort === 'name-asc' ? 'A–Z' : 'Z–A'}
+                </button>
+              </div>
+              <ul className="space-y-2">
+                {sortedMaps.map((map) => (
+                  <li
+                    key={map.id}
+                    className="flex items-center justify-between gap-2 py-2 px-3 rounded-xl bg-white/50 border border-emerald-100"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <button
+                        type="button"
+                        onClick={() => onNavigate(`/maps/${map.slug}`)}
+                        className="text-left text-sm font-medium text-emerald-900 truncate block w-full hover:underline"
+                      >
+                        {map.title}
+                      </button>
+                      <span className="text-[10px] text-emerald-600 font-medium">
+                        {roleForMap(map)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingMapId(map.id);
+                          setEditingOriginalSlug(map.slug);
+                          setMapTitle(map.title);
+                          setMapSlug(map.slug);
+                          setMapDescription(map.description);
+                          setSelectedThemeId(map.themeId || DEFAULT_THEME.id);
+                          setCollaboratorPassword(map.collaboratorPassword || '');
+                          setInvitedAdmins((map.invitedAdminEmails || []).join(', '));
+                          setInvitedCollaborators((map.invitedCollaboratorEmails || []).join(', '));
+                          setBaseThemeId(map.themeId || DEFAULT_THEME.id);
+                          const preset = THEME_PRESETS.find((p) => p.id === map.themeId) ?? DEFAULT_THEME;
+                          const theme = map.theme || preset.theme;
+                          if (theme.categoryColors) {
+                            setCustomEventColor(theme.categoryColors[NodeType.EVENT] ?? customEventColor);
+                            setCustomPersonColor(theme.categoryColors[NodeType.PERSON] ?? customPersonColor);
+                            setCustomSpaceColor(theme.categoryColors[NodeType.SPACE] ?? customSpaceColor);
+                            setCustomCommunityColor(theme.categoryColors[NodeType.COMMUNITY] ?? customCommunityColor);
+                          }
+                          if (theme.connectionLine) {
+                            setCustomConnectionLineColor(theme.connectionLine.color);
+                            setCustomConnectionLineOpacity(theme.connectionLine.opacity);
+                            setCustomConnectionLineThickness(theme.connectionLine.thickness);
+                          }
+                        }}
+                        className="p-1.5 rounded-lg text-emerald-700 hover:bg-emerald-100 transition-colors"
+                        title="Edit map"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => copyMapLink(map)}
+                        className="p-1.5 rounded-lg text-emerald-700 hover:bg-emerald-100 transition-colors"
+                        title="Copy link"
+                      >
+                        <Link2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setQrMapSlug(map.slug)}
+                        className="p-1.5 rounded-lg text-emerald-700 hover:bg-emerald-100 transition-colors"
+                        title="QR code"
+                      >
+                        <QrCode className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMapToDelete(map)}
+                        className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-100 transition-colors"
+                        title="Delete map"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </section>
       </main>
+
+      {/* Delete map confirmation modal */}
+      {mapToDelete && (
+        <div
+          className="fixed inset-0 z-[65] flex items-center justify-center p-4 bg-emerald-950/30 backdrop-blur-sm"
+          onClick={() => setMapToDelete(null)}
+        >
+          <div
+            className="glass w-full max-w-sm rounded-3xl solarpunk-shadow overflow-hidden flex flex-col animate-in fade-in zoom-in duration-300"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-5 border-b border-emerald-100 bg-white/60 flex justify-between items-center">
+              <h2 className="text-lg font-bold text-emerald-950">Delete map?</h2>
+              <button
+                onClick={() => setMapToDelete(null)}
+                className="p-1 rounded-full hover:bg-emerald-100 text-emerald-800 text-xs font-semibold"
+              >
+                Cancel
+              </button>
+            </div>
+            <div className="p-5 space-y-4 bg-white/40">
+              <p className="text-sm text-emerald-900">
+                This will delete <span className="font-semibold">{mapToDelete.title}</span>. This
+                action cannot be undone.
+              </p>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setMapToDelete(null)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-emerald-800 hover:bg-emerald-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDeleteMap}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-rose-600 text-white hover:bg-rose-700"
+                >
+                  Delete map
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {qrMapSlug && typeof window !== 'undefined' && (
         <div

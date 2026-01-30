@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import type { SceneMap, MapNode, User } from '../../../types';
+import type { SceneMap, MapNode, MapConnection, User } from '../../../types';
 import Link from 'next/link';
 
 const KEY_MAPS = 'sceneMapper_maps';
@@ -9,6 +9,10 @@ const KEY_USERS = 'sceneMapper_users';
 
 function nodeStorageKey(mapSlug: string): string {
   return mapSlug === 'torontopia' ? 'torontopia_nodes' : `scene_mapper_nodes_${mapSlug}`;
+}
+
+function connectionStorageKey(mapSlug: string): string {
+  return mapSlug === 'torontopia' ? 'torontopia_connections' : `scene_mapper_connections_${mapSlug}`;
 }
 
 function safeJson<T>(raw: string | null, fallback: T): T {
@@ -24,19 +28,24 @@ function readLocalData(): {
   maps: SceneMap[];
   users: User[];
   nodesBySlug: Record<string, MapNode[]>;
+  connectionsBySlug: Record<string, MapConnection[]>;
 } {
   const maps = safeJson<SceneMap[]>(typeof window !== 'undefined' ? localStorage.getItem(KEY_MAPS) : null, []);
   const users = safeJson<User[]>(typeof window !== 'undefined' ? localStorage.getItem(KEY_USERS) : null, []);
   const nodesBySlug: Record<string, MapNode[]> = {};
+  const connectionsBySlug: Record<string, MapConnection[]> = {};
 
-  if (typeof window === 'undefined') return { maps, users, nodesBySlug };
+  if (typeof window === 'undefined') return { maps, users, nodesBySlug, connectionsBySlug };
 
   for (const m of maps) {
-    const key = nodeStorageKey(m.slug);
-    nodesBySlug[m.slug] = safeJson<MapNode[]>(localStorage.getItem(key), []);
+    const nKey = nodeStorageKey(m.slug);
+    nodesBySlug[m.slug] = safeJson<MapNode[]>(localStorage.getItem(nKey), []);
+    const cKey = connectionStorageKey(m.slug);
+    connectionsBySlug[m.slug] = safeJson<MapConnection[]>(localStorage.getItem(cKey), []);
   }
   if (maps.length === 0 && localStorage.getItem('torontopia_nodes')) {
     nodesBySlug['torontopia'] = safeJson<MapNode[]>(localStorage.getItem('torontopia_nodes'), []);
+    connectionsBySlug['torontopia'] = safeJson<MapConnection[]>(localStorage.getItem('torontopia_connections'), []);
   }
 
   for (let i = 0; i < localStorage.length; i++) {
@@ -45,27 +54,37 @@ function readLocalData(): {
       const slug = key.replace('scene_mapper_nodes_', '');
       if (!nodesBySlug[slug]) nodesBySlug[slug] = safeJson<MapNode[]>(localStorage.getItem(key), []);
     }
+    if (key?.startsWith('scene_mapper_connections_')) {
+      const slug = key.replace('scene_mapper_connections_', '');
+      if (!connectionsBySlug[slug]) connectionsBySlug[slug] = safeJson<MapConnection[]>(localStorage.getItem(key), []);
+    }
   }
 
-  return { maps, users, nodesBySlug };
+  return { maps, users, nodesBySlug, connectionsBySlug };
 }
 
 export default function ImportPage() {
-  const [preview, setPreview] = useState<{ maps: number; users: number; nodes: number } | null>(null);
+  const [preview, setPreview] = useState<{ maps: number; users: number; nodes: number; connections: number } | null>(null);
   const [status, setStatus] = useState<'idle' | 'importing' | 'done' | 'error'>('idle');
   const [message, setMessage] = useState<string>('');
 
   const loadPreview = useCallback(() => {
-    const { maps, users, nodesBySlug } = readLocalData();
+    const { maps, users, nodesBySlug, connectionsBySlug } = readLocalData();
     const nodes = Object.values(nodesBySlug).reduce((a, n) => a + n.length, 0);
-    setPreview({ maps: maps.length, users: users.length, nodes });
+    const connections = Object.values(connectionsBySlug).reduce((a, c) => a + c.length, 0);
+    setPreview({ maps: maps.length, users: users.length, nodes, connections });
     setStatus('idle');
     setMessage('');
   }, []);
 
   const runImport = useCallback(async () => {
-    const { maps, users, nodesBySlug } = readLocalData();
-    if (maps.length === 0 && users.length === 0 && Object.values(nodesBySlug).every((n) => n.length === 0)) {
+    const { maps, users, nodesBySlug, connectionsBySlug } = readLocalData();
+    const hasData =
+      maps.length > 0 ||
+      users.length > 0 ||
+      Object.values(nodesBySlug).some((n) => n.length > 0) ||
+      Object.values(connectionsBySlug).some((c) => c.length > 0);
+    if (!hasData) {
       setMessage('No data found in browser storage.');
       setStatus('idle');
       return;
@@ -102,8 +121,25 @@ export default function ImportPage() {
         });
         if (!r.ok) throw new Error(`Nodes (${slug}): ${r.status} ${await r.text()}`);
       }
+      let connectionMaps = 0;
+      for (const slug of Object.keys(connectionsBySlug)) {
+        const connections = connectionsBySlug[slug];
+        if (connections.length === 0) continue;
+        const r = await fetch(`/api/maps/${encodeURIComponent(slug)}/connections`, {
+          method: 'PUT',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(connections),
+        });
+        if (!r.ok) throw new Error(`Connections (${slug}): ${r.status} ${await r.text()}`);
+        connectionMaps += 1;
+      }
+      const connectionCount = Object.values(connectionsBySlug).reduce((a, c) => a + c.length, 0);
       setStatus('done');
-      setMessage(`Imported ${maps.length} maps, ${users.length} users, and nodes for ${Object.keys(nodesBySlug).length} map(s).`);
+      setMessage(
+        `Imported ${maps.length} maps, ${users.length} users, nodes for ${Object.keys(nodesBySlug).length} map(s)` +
+          (connectionCount > 0 ? `, and ${connectionCount} connection(s) for ${connectionMaps} map(s).` : '.'),
+      );
     } catch (e) {
       setStatus('error');
       setMessage(e instanceof Error ? e.message : 'Import failed.');
@@ -139,7 +175,11 @@ export default function ImportPage() {
               <>
                 <p className="text-sm text-emerald-700">
                   Found: <strong>{preview.maps}</strong> maps, <strong>{preview.users}</strong> users,{' '}
-                  <strong>{preview.nodes}</strong> nodes.
+                  <strong>{preview.nodes}</strong> nodes
+                  {preview.connections > 0 && (
+                    <>, <strong>{preview.connections}</strong> connection(s)</>
+                  )}
+                  .
                 </p>
                 <button
                   type="button"

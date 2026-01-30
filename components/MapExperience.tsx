@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { MapNode, NodeType, UserSession, MapTheme, SceneMap, User, AuthSession } from '../types';
+import { MapNode, MapConnection, NodeType, UserSession, MapTheme, SceneMap, User, AuthSession } from '../types';
 import { INITIAL_NODES, CATEGORY_COLORS } from '../constants';
-import { getNodes as loadNodes, saveNodes as persistNodes, getUsers, getSession, getMaps, getMapBySlug, saveMaps } from '../lib/data';
+import { getNodes as loadNodes, saveNodes as persistNodes, getConnections as loadConnections, saveConnections as persistConnections, getUsers, getSession, getMaps, getMapBySlug, saveMaps } from '../lib/data';
 import Map from './Map';
 import Sidebar from './Sidebar';
 import SubmissionModal from './SubmissionModal';
@@ -64,8 +64,10 @@ const MapExperience: React.FC<MapExperienceProps> = ({
     (storageKey === 'torontopia_nodes' ? 'torontopia' : (storageKey || '').replace(/^scene_mapper_nodes_/, '') || 'torontopia');
 
   const [nodes, setNodes] = useState<MapNode[]>([]);
+  const [connections, setConnections] = useState<MapConnection[]>([]);
   const [userSession, setUserSession] = useState<UserSession>({ role: 'public', name: 'Guest' });
   const [activeFilters, setActiveFilters] = useState<NodeType[]>(Object.values(NodeType));
+  const [connectionsFilterOn, setConnectionsFilterOn] = useState(true);
   const [isSubmissionOpen, setIsSubmissionOpen] = useState(false);
   const [isAdminReviewOpen, setIsAdminReviewOpen] = useState(false);
   const [pendingNode, setPendingNode] = useState<Partial<MapNode> | null>(null);
@@ -83,13 +85,25 @@ const MapExperience: React.FC<MapExperienceProps> = ({
   const [hasShownReviewThisSession, setHasShownReviewThisSession] = useState(false);
   const [nodeSizeScale, setNodeSizeScale] = useState(1);
   const [nodeLabelFontScale, setNodeLabelFontScale] = useState(1);
+  const [regionFontScale, setRegionFontScale] = useState(1);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [enabledNodeTypes, setEnabledNodeTypes] = useState<NodeType[]>(() => Object.values(NodeType));
+  const [connectionsEnabled, setConnectionsEnabled] = useState(true);
 
-  // Load map display settings (node size / font scale) so all viewers see the same
+  // Load map display settings (node size / font scale / enabled types) so all viewers see the same
   useEffect(() => {
     getMapBySlug(effectiveSlug).then((map) => {
       if (map) {
         setNodeSizeScale(map.nodeSizeScale ?? 1);
         setNodeLabelFontScale(map.nodeLabelFontScale ?? 1);
+        setRegionFontScale(map.regionFontScale ?? 1);
+        const enabled =
+          map.enabledNodeTypes && map.enabledNodeTypes.length > 0
+            ? map.enabledNodeTypes
+            : Object.values(NodeType);
+        setEnabledNodeTypes(enabled);
+        setConnectionsEnabled(map.connectionsEnabled !== false);
+        setActiveFilters((prev) => prev.filter((t) => enabled.includes(t)));
       }
     });
   }, [effectiveSlug]);
@@ -101,6 +115,13 @@ const MapExperience: React.FC<MapExperienceProps> = ({
         setNodes(loaded.length ? loaded : effectiveSlug === 'torontopia' ? INITIAL_NODES : []);
       })
       .catch(() => setNodes(effectiveSlug === 'torontopia' ? INITIAL_NODES : []));
+  }, [effectiveSlug]);
+
+  // Load connections from data layer
+  useEffect(() => {
+    loadConnections(effectiveSlug)
+      .then(setConnections)
+      .catch(() => setConnections([]));
   }, [effectiveSlug]);
 
   // Hydrate user role from data layer
@@ -140,6 +161,14 @@ const MapExperience: React.FC<MapExperienceProps> = ({
     [effectiveSlug],
   );
 
+  const saveConnections = useCallback(
+    (newConnections: MapConnection[]) => {
+      setConnections(newConnections);
+      void persistConnections(effectiveSlug, newConnections);
+    },
+    [effectiveSlug],
+  );
+
   const persistNodeSizeScale = useCallback(
     (value: number) => {
       setNodeSizeScale(value);
@@ -162,6 +191,20 @@ const MapExperience: React.FC<MapExperienceProps> = ({
         if (idx === -1) return;
         const updated = [...maps];
         updated[idx] = { ...updated[idx], nodeLabelFontScale: value };
+        void saveMaps(updated);
+      });
+    },
+    [effectiveSlug],
+  );
+
+  const persistRegionFontScale = useCallback(
+    (value: number) => {
+      setRegionFontScale(value);
+      getMaps().then((maps) => {
+        const idx = maps.findIndex((m) => m.slug === effectiveSlug);
+        if (idx === -1) return;
+        const updated = [...maps];
+        updated[idx] = { ...updated[idx], regionFontScale: value };
         void saveMaps(updated);
       });
     },
@@ -194,6 +237,23 @@ const MapExperience: React.FC<MapExperienceProps> = ({
     setSelectedNode(null);
     setPopupAnchor(null);
   };
+
+  const handleSubmitConnection = useCallback(
+    (partial: Partial<MapConnection>) => {
+      const connection: MapConnection = {
+        id: Math.random().toString(36).slice(2, 11),
+        fromNodeId: partial.fromNodeId!,
+        toNodeId: partial.toNodeId!,
+        description: partial.description ?? '',
+        collaboratorId: userSession.name,
+        status: (partial.status as MapConnection['status']) ?? (userSession.role === 'public' ? 'pending' : 'approved'),
+      };
+      const next = [...connections, connection];
+      saveConnections(next);
+      setIsSubmissionOpen(false);
+    },
+    [connections, userSession.name, userSession.role, saveConnections],
+  );
 
   // Finalizes node creation upon map click
   const handleMapClick = (x: number, y: number) => {
@@ -236,6 +296,34 @@ const MapExperience: React.FC<MapExperienceProps> = ({
     }
   };
 
+  const handleApproveConnection = useCallback(
+    (id: string) => {
+      const updated = connections.map((c) =>
+        c.id === id ? { ...c, status: 'approved' as const } : c,
+      );
+      saveConnections(updated);
+    },
+    [connections, saveConnections],
+  );
+
+  const handleDenyConnection = useCallback(
+    (id: string) => {
+      const updated = connections.filter((c) => c.id !== id);
+      saveConnections(updated);
+    },
+    [connections, saveConnections],
+  );
+
+  const handleConnectionCurveChange = useCallback(
+    (connectionId: string, curveOffsetX: number, curveOffsetY: number) => {
+      const updated = connections.map((c) =>
+        c.id === connectionId ? { ...c, curveOffsetX, curveOffsetY } : c,
+      );
+      saveConnections(updated);
+    },
+    [connections, saveConnections],
+  );
+
   // --- Filtering & Role Switching ---
 
   const toggleFilter = (type: NodeType) => {
@@ -253,7 +341,9 @@ const MapExperience: React.FC<MapExperienceProps> = ({
   };
 
   // Computed data for UI
-  const pendingReviewCount = nodes.filter((n) => n.status === 'pending').length;
+  const pendingNodeCount = nodes.filter((n) => n.status === 'pending').length;
+  const pendingConnectionCount = connections.filter((c) => c.status === 'pending').length;
+  const pendingReviewCount = pendingNodeCount + pendingConnectionCount;
 
   const categoryColors: Record<NodeType, string> = {
     [NodeType.EVENT]:
@@ -264,9 +354,12 @@ const MapExperience: React.FC<MapExperienceProps> = ({
       mapTheme?.categoryColors?.[NodeType.SPACE] ?? CATEGORY_COLORS[NodeType.SPACE],
     [NodeType.COMMUNITY]:
       mapTheme?.categoryColors?.[NodeType.COMMUNITY] ?? CATEGORY_COLORS[NodeType.COMMUNITY],
+    [NodeType.REGION]:
+      mapTheme?.categoryColors?.[NodeType.REGION] ?? CATEGORY_COLORS[NodeType.REGION],
   };
 
   const filteredNodes = nodes.filter((n) => {
+    if (!enabledNodeTypes.includes(n.type)) return false;
     const passFilter = activeFilters.includes(n.type);
     const isOwnPending =
       n.status === 'pending' && n.collaboratorId && n.collaboratorId === userSession.name;
@@ -447,15 +540,6 @@ const MapExperience: React.FC<MapExperienceProps> = ({
               </span>
             </button>
           )}
-          {!pendingNode && (
-            <button
-              onClick={() => setIsSubmissionOpen(true)}
-              className="hidden md:flex bg-emerald-600 text-white p-3 rounded-2xl solarpunk-shadow hover:bg-emerald-700 transition-transform active:scale-95 items-center gap-2 px-5 font-bold"
-            >
-              <Plus size={20} />
-              Add Entry
-            </button>
-          )}
         </div>
       </div>
 
@@ -477,8 +561,18 @@ const MapExperience: React.FC<MapExperienceProps> = ({
 
       {/* Join as collaborator modal */}
       {isJoinOpen && (
-        <div className="absolute inset-0 z-[65] flex items-center justify-center bg-emerald-950/30 backdrop-blur-sm px-4">
-          <div className="glass w-full max-w-md rounded-3xl solarpunk-shadow overflow-hidden">
+        <div
+          className="absolute inset-0 z-[65] flex items-center justify-center bg-emerald-950/30 backdrop-blur-sm px-4"
+          onClick={() => {
+            setIsJoinOpen(false);
+            setJoinPassword('');
+            setJoinError(null);
+          }}
+        >
+          <div
+            className="glass w-full max-w-md rounded-3xl solarpunk-shadow overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="p-5 border-b border-emerald-100 flex justify-between items-center bg-white/60">
               <div>
                 <h2 className="text-lg font-bold text-emerald-950">Join as collaborator</h2>
@@ -540,14 +634,31 @@ const MapExperience: React.FC<MapExperienceProps> = ({
           isEditable={userSession.role !== 'public'}
           isPlacing={!!pendingNode}
           backgroundImageUrl={mapBackgroundImageUrl}
+          mapSlug={effectiveSlug}
           categoryColors={categoryColors}
           nodeSizeScale={nodeSizeScale}
           nodeLabelFontScale={nodeLabelFontScale}
+          regionFontScale={regionFontScale}
+          connections={
+            connectionsEnabled && connectionsFilterOn ? connections : []
+          }
+          currentUserName={userSession.name}
+          onConnectionCurveChange={userSession.role !== 'public' ? handleConnectionCurveChange : undefined}
+          connectionLineStyle={mapTheme?.connectionLine ?? (mapTheme ? { color: mapTheme.primaryColor, opacity: 0.6, thickness: 2 } : undefined)}
         />
 
         {/* Floating Popup for Node Details */}
         {selectedNode && popupAnchor && (
-          <NodePopup
+          <>
+            <div
+              className="fixed inset-0 z-[59]"
+              onClick={() => {
+                setSelectedNode(null);
+                setPopupAnchor(null);
+              }}
+              aria-hidden="true"
+            />
+            <NodePopup
             node={selectedNode}
             anchor={popupAnchor}
             onClose={() => {
@@ -558,13 +669,18 @@ const MapExperience: React.FC<MapExperienceProps> = ({
             userRole={userSession.role}
             onEditNode={userSession.role === 'public' ? undefined : startEditNode}
             onRequestDeleteNode={userSession.role === 'admin' ? requestDeleteNode : undefined}
-          />
+            />
+          </>
         )}
       </main>
 
       {/* Floating Action Button (FAB) + Admin review button */}
       {!pendingNode && (
-        <div className="fixed bottom-24 right-6 md:bottom-10 md:right-[410px] z-[55] flex items-center gap-3">
+        <div
+          className={`fixed bottom-24 right-6 md:bottom-10 z-[55] flex items-center gap-3 transition-[right] duration-300 ${
+            sidebarCollapsed ? 'md:right-[90px]' : 'md:right-[410px]'
+          }`}
+        >
           {userSession.role === 'admin' && pendingReviewCount > 0 && (
             <button
               onClick={() => setIsAdminReviewOpen(true)}
@@ -588,6 +704,10 @@ const MapExperience: React.FC<MapExperienceProps> = ({
       <Sidebar
         activeFilters={activeFilters}
         onToggleFilter={toggleFilter}
+        enabledNodeTypes={enabledNodeTypes}
+        connectionsEnabled={connectionsEnabled}
+        connectionsFilterOn={connectionsFilterOn}
+        onConnectionsFilterToggle={() => setConnectionsFilterOn((v) => !v)}
         selectedNode={selectedNode}
         onClearSelection={() => {
           setSelectedNode(null);
@@ -604,6 +724,8 @@ const MapExperience: React.FC<MapExperienceProps> = ({
         onNodeSizeScaleChange={userSession.role === 'admin' ? persistNodeSizeScale : undefined}
         nodeLabelFontScale={nodeLabelFontScale}
         onNodeLabelFontScaleChange={userSession.role === 'admin' ? persistNodeLabelFontScale : undefined}
+        regionFontScale={regionFontScale}
+        onRegionFontScaleChange={userSession.role === 'admin' ? persistRegionFontScale : undefined}
         onEditMapSettings={
           userSession.role === 'admin' && effectiveSlug
             ? () => {
@@ -615,6 +737,7 @@ const MapExperience: React.FC<MapExperienceProps> = ({
               }
             : undefined
         }
+        onCollapsedChange={setSidebarCollapsed}
       />
 
       {/* Modals */}
@@ -622,24 +745,43 @@ const MapExperience: React.FC<MapExperienceProps> = ({
         <SubmissionModal
           onClose={() => setIsSubmissionOpen(false)}
           onSubmit={startPlacement}
+          onSubmitConnection={handleSubmitConnection}
           userRole={userSession.role}
+          enabledNodeTypes={enabledNodeTypes}
+          connectionsEnabled={connectionsEnabled}
+          approvedNodes={nodes.filter(
+            (n) =>
+              enabledNodeTypes.includes(n.type) &&
+              (n.status === 'approved' ||
+                (n.status === 'pending' && n.collaboratorId === userSession.name)),
+          )}
         />
       )}
 
       {isAdminReviewOpen && (
         <AdminReviewModal
           pendingNodes={nodes.filter((n) => n.status === 'pending')}
+          pendingConnections={connections.filter((c) => c.status === 'pending')}
           onClose={() => setIsAdminReviewOpen(false)}
           onApprove={handleApprove}
           onDeny={handleDeny}
+          onApproveConnection={handleApproveConnection}
+          onDenyConnection={handleDenyConnection}
           mapTheme={mapTheme}
+          nodes={nodes}
         />
       )}
 
       {/* Edit node modal */}
       {isEditOpen && selectedNode && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-emerald-950/20 backdrop-blur-sm">
-          <div className="glass w-full max-w-lg rounded-3xl solarpunk-shadow overflow-hidden flex flex-col animate-in fade-in zoom-in duration-300">
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-emerald-950/20 backdrop-blur-sm"
+          onClick={() => setIsEditOpen(false)}
+        >
+          <div
+            className="glass w-full max-w-lg rounded-3xl solarpunk-shadow overflow-hidden flex flex-col animate-in fade-in zoom-in duration-300"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="p-6 border-b border-emerald-100 flex justify-between items-center bg-white/50">
               <h2 className="text-2xl font-bold text-emerald-950">Edit</h2>
               <button
@@ -672,7 +814,7 @@ const MapExperience: React.FC<MapExperienceProps> = ({
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-[11px] font-semibold text-emerald-900">Website</label>
+                <label className="text-[11px] font-semibold text-emerald-900">Link</label>
                 <input
                   type="url"
                   className="w-full bg-white/80 border border-emerald-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-400"
@@ -694,8 +836,14 @@ const MapExperience: React.FC<MapExperienceProps> = ({
 
       {/* Delete confirmation modal */}
       {isDeleteConfirmOpen && selectedNode && (
-        <div className="fixed inset-0 z-[65] flex items-center justify-center p-4 bg-emerald-950/30 backdrop-blur-sm">
-          <div className="glass w-full max-w-sm rounded-3xl solarpunk-shadow overflow-hidden flex flex-col animate-in fade-in zoom-in duration-300">
+        <div
+          className="fixed inset-0 z-[65] flex items-center justify-center p-4 bg-emerald-950/30 backdrop-blur-sm"
+          onClick={() => setIsDeleteConfirmOpen(false)}
+        >
+          <div
+            className="glass w-full max-w-sm rounded-3xl solarpunk-shadow overflow-hidden flex flex-col animate-in fade-in zoom-in duration-300"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="p-5 border-b border-emerald-100 bg-white/60 flex justify-between items-center">
               <h2 className="text-lg font-bold text-emerald-950">Delete node?</h2>
               <button

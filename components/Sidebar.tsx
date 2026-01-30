@@ -1,11 +1,27 @@
 
 import React from 'react';
 import { NodeType, MapNode, MapTheme } from '../types';
-import { Filter, X, ExternalLink, Calendar, MapPin, User, Building, Leaf, Pencil, Trash2, Settings2, Link2, QrCode } from 'lucide-react';
+import { Filter, X, ExternalLink, Calendar, MapPin, User, Building, Leaf, Globe, Pencil, Trash2, Settings2, Link2, QrCode } from 'lucide-react';
+
+/** Squiggly/curved line icon for connection filter (20px, matches other filter icons). */
+function ConnectionLineIcon({ size = 20, className }: { size?: number; className?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M3 12 Q8 6 14 12 Q20 18 21 12" />
+    </svg>
+  );
+}
 
 interface SidebarProps {
   activeFilters: NodeType[];
   onToggleFilter: (type: NodeType) => void;
+  /** Node types enabled for this map; only these appear in the filter. When absent, all types shown. */
+  enabledNodeTypes?: NodeType[];
+  /** When false, Connections option is hidden from filter. Default true. */
+  connectionsEnabled?: boolean;
+  /** When true, connection lines are shown on the map. */
+  connectionsFilterOn: boolean;
+  onConnectionsFilterToggle: () => void;
   selectedNode: MapNode | null;
   onClearSelection: () => void;
   userRole: string;
@@ -26,11 +42,17 @@ interface SidebarProps {
   nodeLabelFontScale?: number;
   /** Called when admin changes label font size. Admin only. */
   onNodeLabelFontScaleChange?: (value: number) => void;
+  /** Called when the sidebar is collapsed or expanded (so parent can adjust FAB position). */
+  onCollapsedChange?: (collapsed: boolean) => void;
 }
 
 function Sidebar({
   activeFilters,
   onToggleFilter,
+  enabledNodeTypes,
+  connectionsEnabled = true,
+  connectionsFilterOn,
+  onConnectionsFilterToggle,
   selectedNode,
   onClearSelection,
   userRole,
@@ -45,13 +67,32 @@ function Sidebar({
   onNodeSizeScaleChange,
   nodeLabelFontScale = 1,
   onNodeLabelFontScaleChange,
+  regionFontScale = 1,
+  onRegionFontScaleChange,
+  onCollapsedChange,
 }: SidebarProps) {
   const categoryColors = mapTheme?.categoryColors;
   const [isCollapsed, setIsCollapsed] = React.useState(false);
+  React.useEffect(() => {
+    onCollapsedChange?.(isCollapsed);
+  }, [isCollapsed, onCollapsedChange]);
+
+  // Expand sidebar when a node (e.g. region) is selected so options are visible
+  React.useEffect(() => {
+    if (selectedNode) setIsCollapsed(false);
+  }, [selectedNode]);
   const [linkCopied, setLinkCopied] = React.useState(false);
   const [showQR, setShowQR] = React.useState(false);
+  // Set shareUrl only after mount so server and first client render match (avoids hydration error)
+  const [shareUrl, setShareUrl] = React.useState('');
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => {
+    setMounted(true);
+    if (mapSlug && typeof window !== 'undefined') {
+      setShareUrl(`${window.location.origin}/maps/${mapSlug}`);
+    }
+  }, [mapSlug]);
 
-  const shareUrl = mapSlug && typeof window !== 'undefined' ? `${window.location.origin}/maps/${mapSlug}` : '';
   const copyShareLink = () => {
     if (!shareUrl) return;
     navigator.clipboard.writeText(shareUrl).then(() => {
@@ -59,12 +100,18 @@ function Sidebar({
       setTimeout(() => setLinkCopied(false), 2000);
     });
   };
-  const filterOptions = [
+  const allFilterOptions = [
     { type: NodeType.EVENT, label: 'Events', icon: Calendar },
     { type: NodeType.PERSON, label: 'People', icon: User },
     { type: NodeType.SPACE, label: 'Spaces', icon: Building },
     { type: NodeType.COMMUNITY, label: 'Communities', icon: Leaf },
+    { type: NodeType.REGION, label: 'Regions', icon: Globe },
   ];
+  const filterOptions = (enabledNodeTypes
+    ? allFilterOptions.filter((o) => enabledNodeTypes.includes(o.type))
+    : allFilterOptions).filter((o) => o.type !== NodeType.REGION || userRole === 'admin');
+  const connectionLineColor =
+    mapTheme?.connectionLine?.color ?? mapTheme?.primaryColor ?? '#059669';
 
   return (
     <div className="fixed right-0 top-0 h-full z-50 flex items-stretch pointer-events-none">
@@ -155,6 +202,7 @@ function Sidebar({
               </div>
             )}
 
+            {false && selectedNode.tags.length > 0 && (
             <div className="flex flex-wrap gap-2 mt-4">
               {selectedNode.tags.map(tag => (
                 <span key={tag} className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-lg text-xs font-medium border border-emerald-100">
@@ -162,6 +210,7 @@ function Sidebar({
                 </span>
               ))}
             </div>
+            )}
 
             <div className="mt-8 pt-8 border-t border-emerald-100 space-y-4">
               <div className="flex items-center gap-3 text-emerald-900">
@@ -226,9 +275,32 @@ function Sidebar({
                   </div>
                 </button>
               ))}
+              {connectionsEnabled && (
+                <button
+                  onClick={onConnectionsFilterToggle}
+                  className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${
+                    connectionsFilterOn
+                      ? 'bg-white border-emerald-400 solarpunk-shadow scale-[1.02]'
+                      : 'bg-emerald-50/50 border-transparent opacity-60 grayscale'
+                  }`}
+                >
+                  <div className="flex items-center gap-4">
+                    <div
+                      className="w-10 h-10 rounded-xl flex items-center justify-center text-white"
+                      style={{ backgroundColor: connectionLineColor }}
+                    >
+                      <ConnectionLineIcon size={20} className="text-white" />
+                    </div>
+                    <span className="font-bold text-emerald-900">Connections</span>
+                  </div>
+                  <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${connectionsFilterOn ? 'border-emerald-500 bg-emerald-500' : 'border-emerald-200'}`}>
+                    {connectionsFilterOn && <div className="w-2 h-2 bg-white rounded-full" />}
+                  </div>
+                </button>
+              )}
             </div>
 
-            {userRole === 'admin' && onNodeSizeScaleChange && (
+            {mounted && userRole === 'admin' && onNodeSizeScaleChange && (
               <div className="space-y-2">
                 <h3 className="text-sm font-bold text-emerald-900">Node size</h3>
                 <div className="flex items-center gap-3">
@@ -248,7 +320,7 @@ function Sidebar({
               </div>
             )}
 
-            {userRole === 'admin' && onNodeLabelFontScaleChange && (
+            {mounted && userRole === 'admin' && onNodeLabelFontScaleChange && (
               <div className="space-y-2">
                 <h3 className="text-sm font-bold text-emerald-900">Label font size</h3>
                 <div className="flex items-center gap-3">
@@ -268,7 +340,27 @@ function Sidebar({
               </div>
             )}
 
-            {mapSlug && shareUrl && (
+            {mounted && userRole === 'admin' && onRegionFontScaleChange && (
+              <div className="space-y-2">
+                <h3 className="text-sm font-bold text-emerald-900">Region font size</h3>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range"
+                    min={0.5}
+                    max={2}
+                    step={0.1}
+                    value={regionFontScale}
+                    onChange={(e) => onRegionFontScaleChange(parseFloat(e.target.value))}
+                    className="flex-1 h-2 rounded-full appearance-none bg-emerald-100 accent-emerald-600"
+                  />
+                  <span className="text-xs font-medium text-emerald-800 w-8">
+                    {Math.round(regionFontScale * 100)}%
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {mounted && mapSlug && shareUrl && (
               <div className="space-y-2">
                 <h3 className="text-sm font-bold text-emerald-900">Share</h3>
                 <div className="flex items-center gap-2">

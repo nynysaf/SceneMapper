@@ -15,7 +15,9 @@ This doc covers creating the Supabase project, applying the schema, and setting 
 1. In the project: **SQL Editor** → **New query**.
 2. Open `supabase/migrations/20250129000001_initial_schema.sql` from this repo.
 3. Paste the full contents into the editor and run it.
-4. Confirm in **Table Editor** that `users`, `maps`, and `nodes` exist.
+4. Open `supabase/migrations/20250130000001_connections.sql` (Phase 7: connections table).
+5. Paste the full contents into a **new query** and run it.
+6. Confirm in **Table Editor** that `users`, `maps`, `nodes`, and `connections` exist.
 
 **Option B – Supabase CLI**
 
@@ -26,6 +28,8 @@ supabase init   # if not already
 supabase link   # link to your project
 supabase db push
 ```
+
+This runs all migrations in order (including `20250130000001_connections.sql`), so `connections` will be created after `nodes`.
 
 ## 3. Get API credentials
 
@@ -51,7 +55,7 @@ Do not commit `.env.local`. It is listed in `.gitignore`.
 
 ## 5. Verify
 
-- Tables exist in Supabase (Table Editor).
+- Tables exist in Supabase (Table Editor): `users`, `maps`, `nodes`, `connections`.
 - `.env.local` has `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` set.
 
-Next: **Phase 3** – add `lib/supabase-server.ts`, wire API routes to these tables, and add the `NEXT_PUBLIC_USE_BACKEND` switch in `lib/data.ts`.
+Next: **Phase 3** – add `lib/supabase-server.ts`, wire API routes to these tables, and add the `NEXT_PUBLIC_USE_BACKEND` switch in `lib/data.ts`. The import tool at `/dashboard/import` can copy maps, users, nodes, and connections from browser localStorage into Supabase.

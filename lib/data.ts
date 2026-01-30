@@ -4,7 +4,7 @@
  * Otherwise uses localStorage.
  */
 
-import type { SceneMap, MapNode, User, AuthSession } from '../types';
+import type { SceneMap, MapNode, MapConnection, User, AuthSession } from '../types';
 
 const USE_BACKEND =
   typeof process !== 'undefined' &&
@@ -63,6 +63,19 @@ async function saveNodesApi(mapSlug: string, nodes: MapNode[]): Promise<void> {
   if (!r.ok) throw new Error(`saveNodes: ${r.status}`);
 }
 
+// --- Connections (backend) ---
+
+async function getConnectionsApi(mapSlug: string): Promise<MapConnection[]> {
+  const r = await fetch(`${apiBase()}/api/maps/${encodeURIComponent(mapSlug)}/connections`, { credentials: 'include' });
+  if (!r.ok) throw new Error(`getConnections: ${r.status}`);
+  return r.json();
+}
+
+async function saveConnectionsApi(mapSlug: string, connections: MapConnection[]): Promise<void> {
+  const r = await fetch(`${apiBase()}/api/maps/${encodeURIComponent(mapSlug)}/connections`, fetchOpts('PUT', connections));
+  if (!r.ok) throw new Error(`saveConnections: ${r.status}`);
+}
+
 // --- Users & session (backend) ---
 
 async function getUsersApi(): Promise<User[]> {
@@ -99,6 +112,10 @@ const KEY_SESSION = 'sceneMapper_session';
 
 function nodeStorageKey(mapSlug: string): string {
   return mapSlug === 'torontopia' ? 'torontopia_nodes' : `scene_mapper_nodes_${mapSlug}`;
+}
+
+function connectionStorageKey(mapSlug: string): string {
+  return mapSlug === 'torontopia' ? 'torontopia_connections' : `scene_mapper_connections_${mapSlug}`;
 }
 
 function safeJson<T>(raw: string | null, fallback: T): T {
@@ -160,6 +177,25 @@ export async function copyNodesToSlug(fromSlug: string, toSlug: string): Promise
   if (fromSlug === toSlug) return;
   const nodes = await getNodes(fromSlug);
   await saveNodes(toSlug, nodes);
+}
+
+// --- Public API: Connections ---
+
+export async function getConnections(mapSlug: string): Promise<MapConnection[]> {
+  guard();
+  if (USE_BACKEND) return getConnectionsApi(mapSlug);
+  const key = connectionStorageKey(mapSlug);
+  return safeJson<MapConnection[]>(localStorage.getItem(key), []);
+}
+
+export async function saveConnections(mapSlug: string, connections: MapConnection[]): Promise<void> {
+  guard();
+  if (USE_BACKEND) {
+    await saveConnectionsApi(mapSlug, connections);
+    return;
+  }
+  const key = connectionStorageKey(mapSlug);
+  localStorage.setItem(key, JSON.stringify(connections));
 }
 
 // --- Public API: Users & session ---
