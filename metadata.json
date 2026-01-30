@@ -1,0 +1,7 @@
+{
+  "name": "Toronto's Emerging Scene",
+  "description": "A collaborative, fantasy-styled map for Toronto's vibrant communities, spaces, and events. Features draggable nodes, public remixing, and a solarpunk aesthetic.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}

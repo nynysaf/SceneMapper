@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-[#fdfcf0] text-emerald-950 antialiased;
+}
+
+.solarpunk-shadow {
+  @apply shadow-[0_18px_45px_rgba(16,185,129,0.28)];
+}
+
+.glass {
+  @apply bg-white/70 backdrop-blur-md border border-white/60 shadow-md;
+}
+

@@ -1,0 +1,29 @@
+Scene Mapper
+
+Description
+Scene Mapper is a web/mobile tool that allows a 'scene' (community) to collaboratively create a living visual map of the events, people, spaces and communities that compose the 'scene'. An individual can create a new map, set permissions, add the background image, designate other admins, and adjust the colour themes. Collaborators may add to the map freely (as designated  in the permissions), and the public may view the map and submit new nodes or connections.
+
+
+Architecture
+Scene Mapper Landing Page
+Explains Scene Mapper
+Button to log-in or create an account
+Button to create a map (requires an account)
+
+Create a map
+The admin gets a creation form that generates the map
+Includes a title, url slug, map description (up to 300 words), canvas image upload or generation, add other emails to invite other admins or collaborators, map themes: a few font options and some premade colour pallets (or custom). There is a section to set the collaborator password (allows someone to join as a collaborator).
+A button to generate the map
+
+Logged in user view
+Once logged in a user can view the maps they are admin for, the maps they have entered collaborator password for, and the maps they have viewed as public.
+They can also change their email address or password
+The 'create map' button also appears here
+
+Map view
+This view has already been created
+If a public user wants to join as collaborator they are prompted for the password
+At any point someone can log-in which links the map to their account (with the access level granted)
+
+Sharing
+Maps should be easily shared by url, via social channels, or generate a QR code for folks to view the map in public. 
