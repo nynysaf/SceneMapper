@@ -62,8 +62,8 @@ const SubmissionModal: React.FC<SubmissionModalProps> = ({
       onClose();
       return;
     }
-    // Node: require category and title
-    if (submissionKind == null || submissionKind === 'CONNECTION') return;
+    // Node: require category and title (CONNECTION already handled above)
+    if (submissionKind == null) return;
     const title = formData.title?.trim();
     if (!title) return;
     onSubmit({ ...formData, type: submissionKind, title });
