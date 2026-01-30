@@ -96,9 +96,8 @@ export async function POST(request: NextRequest) {
           role: 'admin',
           fromEmail,
         });
-        if (!result.sent) {
-          const err = result.error;
-          console.error('Invitation email (admin)', to, err);
+        if ('error' in result) {
+          console.error('Invitation email (admin)', to, result.error);
         }
       }
       for (const to of newCollaboratorEmails) {
@@ -108,9 +107,8 @@ export async function POST(request: NextRequest) {
           role: 'collaborator',
           fromEmail,
         });
-        if (!result.sent) {
-          const err = result.error;
-          console.error('Invitation email (collaborator)', to, err);
+        if ('error' in result) {
+          console.error('Invitation email (collaborator)', to, result.error);
         }
       }
     }
