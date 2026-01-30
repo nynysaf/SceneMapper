@@ -96,7 +96,10 @@ export async function POST(request: NextRequest) {
           role: 'admin',
           fromEmail,
         });
-        if (!result.sent) console.error('Invitation email (admin)', to, result.error);
+        if (!result.sent) {
+          const err = result.error;
+          console.error('Invitation email (admin)', to, err);
+        }
       }
       for (const to of newCollaboratorEmails) {
         const result = await sendInvitationEmail({
@@ -105,7 +108,10 @@ export async function POST(request: NextRequest) {
           role: 'collaborator',
           fromEmail,
         });
-        if (!result.sent) console.error('Invitation email (collaborator)', to, result.error);
+        if (!result.sent) {
+          const err = result.error;
+          console.error('Invitation email (collaborator)', to, err);
+        }
       }
     }
 
