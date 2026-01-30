@@ -42,6 +42,10 @@ interface SidebarProps {
   nodeLabelFontScale?: number;
   /** Called when admin changes label font size. Admin only. */
   onNodeLabelFontScaleChange?: (value: number) => void;
+  /** Region label font scale (REGION nodes only). Admin only. */
+  regionFontScale?: number;
+  /** Called when admin changes region font size. Admin only. */
+  onRegionFontScaleChange?: (value: number) => void;
   /** Called when the sidebar is collapsed or expanded (so parent can adjust FAB position). */
   onCollapsedChange?: (collapsed: boolean) => void;
   /** When set, shows Download in Share section; called with chosen format when user picks one. */
