@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
+import { clearSessionCookieOnResponse } from '@/lib/session-cookie';
 
 /**
  * POST /api/auth/logout
- * Clears session (e.g. cookie). Replace with real session clear when backend is connected.
+ * Clears the session cookie.
  */
 export async function POST() {
-  // TODO: clear session cookie / invalidate server-side session
-  return NextResponse.json({ ok: true });
+  const response = NextResponse.json({ ok: true });
+  clearSessionCookieOnResponse(response);
+  return response;
 }

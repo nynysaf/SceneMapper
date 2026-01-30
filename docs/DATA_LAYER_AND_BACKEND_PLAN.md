@@ -4,7 +4,7 @@
 
 **Constraints:** Light data, free-tier hosting (e.g. Vercel + free DB).
 
-**Session state:** Phase 1 complete (data layer + refactor). Phase 3 API routes exist as stubs; next: Phase 2 (Supabase schema) then wire routes to DB and add `NEXT_PUBLIC_USE_BACKEND` switch in `lib/data.ts`.
+**Session state:** Phase 1 complete (data layer + refactor). Phase 2 schema and env template added (`supabase/migrations/`, `.env.example`, `docs/SUPABASE_PHASE2_SETUP.md`). Phase 3 API routes exist as stubs; next: create Supabase project and run migration, then wire routes to DB and add `NEXT_PUBLIC_USE_BACKEND` switch in `lib/data.ts`.
 
 ---
 
@@ -132,6 +132,17 @@ Use **Row Level Security (RLS)** so that only your backend (service role) or aut
 - `SUPABASE_URL` — Supabase project URL.
 - `SUPABASE_SERVICE_ROLE_KEY` — server-only; used in API routes. Never expose to client.
 
+See **`.env.example`** for a template and **`docs/SUPABASE_PHASE2_SETUP.md`** for step-by-step setup.
+
+### 2.4 Phase 2 checklist
+
+- [x] Schema defined in `supabase/migrations/20250129000001_initial_schema.sql` (users, maps, nodes, RLS, updated_at triggers).
+- [x] `.env.example` created with `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_APP_URL`.
+- [x] Setup guide added: `docs/SUPABASE_PHASE2_SETUP.md`.
+- [ ] Create Supabase project at [supabase.com/dashboard](https://supabase.com/dashboard).
+- [ ] Run the migration (SQL Editor or `supabase db push`).
+- [ ] Copy `.env.example` to `.env.local` and set the three env vars.
+
 ---
 
 ## Phase 3: Backend implementation
@@ -173,14 +184,14 @@ Implement every existing data-layer function against the API (e.g. `getMaps()` �
 ### 3.4 Checklist (Phase 3)
 
 - [ ] Supabase project created; tables `users`, `maps`, `nodes` created (and RLS if desired).
-- [ ] `lib/supabase-server.ts` (or equivalent) for server-side Supabase client.
-- [x] API routes exist as stubs (`app/api/maps`, `app/api/maps/[slug]`, `app/api/maps/[slug]/nodes`, `app/api/users`, `app/api/auth/login`, `app/api/auth/logout`, `app/api/auth/session`) — return empty/default data; not yet wired to Supabase.
-- [ ] `lib/data.ts` (or data-api) implemented to call these APIs when `NEXT_PUBLIC_USE_BACKEND=true`.
+- [x] `lib/supabase-server.ts` for server-side Supabase client.
+- [x] API routes wired to Supabase (`lib/db-mappers.ts`, `lib/password.ts`, `lib/session-cookie.ts`; maps, users, auth).
+- [x] `lib/data.ts` calls these APIs when `NEXT_PUBLIC_USE_BACKEND=true`; otherwise uses localStorage.
 - [ ] Env vars set locally; full flow works against Supabase (signup, login, create map, add node, approve, view map).
 
 ---
 
-## Phase 4: Data migration (optional)
+## Phase 4: Data migration (optional) — done: /dashboard/import tool
 
 - **One-time:** If you need to keep existing localStorage data:
   - Add a small “Import from browser” tool (or a script) that reads `sceneMapper_maps`, `sceneMapper_users`, `scene_mapper_nodes_*`, `torontopia_nodes` from localStorage and POSTs them to your API so they get inserted into Supabase.

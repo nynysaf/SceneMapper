@@ -586,6 +586,14 @@ const Dashboard: React.FC<DashboardProps> = ({
               </div>
             </div>
           )}
+          <p className="mt-3">
+            <a
+              href="/dashboard/import"
+              className="text-[11px] text-emerald-600 hover:text-emerald-800 underline"
+            >
+              Import from browser storage →
+            </a>
+          </p>
         </section>
 
         <section className="flex-1 max-w-md space-y-4">

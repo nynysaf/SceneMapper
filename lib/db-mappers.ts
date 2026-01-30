@@ -1,0 +1,152 @@
+/**
+ * Map between Supabase row shapes (snake_case) and app types (camelCase).
+ * Used by API routes when reading/writing the database.
+ */
+import type { SceneMap, MapNode, User, MapTheme } from '@/types';
+
+// --- DB row types (snake_case, matching migration) ---
+
+export interface DbUser {
+  id: string;
+  email: string;
+  name: string;
+  password_hash: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface DbMap {
+  id: string;
+  slug: string;
+  title: string;
+  description: string;
+  background_image_url: string | null;
+  theme: MapTheme;
+  collaborator_password_hash: string | null;
+  admin_ids: string[];
+  collaborator_ids: string[];
+  public_view: boolean;
+  theme_id: string | null;
+  invited_admin_emails: string[] | null;
+  invited_collaborator_emails: string[] | null;
+  node_size_scale: number | null;
+  node_label_font_scale: number | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface DbNode {
+  id: string;
+  map_id: string;
+  type: string;
+  title: string;
+  description: string;
+  website: string | null;
+  x: number;
+  y: number;
+  tags: string[];
+  primary_tag: string;
+  collaborator_id: string;
+  status: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// --- Row -> App ---
+
+export function dbUserToUser(row: DbUser): User {
+  return {
+    id: row.id,
+    email: row.email,
+    name: row.name ?? '',
+    password: '', // never send password to client; API returns user without it
+  };
+}
+
+const DEFAULT_THEME: MapTheme = {
+  primaryColor: '#0d9488',
+  secondaryColor: '#f59e0b',
+  accentColor: '#0ea5e9',
+  backgroundColor: '#f0fdf4',
+};
+
+export function dbMapToSceneMap(row: DbMap): SceneMap {
+  const theme = row.theme && typeof row.theme === 'object' && 'primaryColor' in row.theme
+    ? (row.theme as MapTheme)
+    : DEFAULT_THEME;
+  return {
+    id: row.id,
+    slug: row.slug,
+    title: row.title ?? '',
+    description: row.description ?? '',
+    backgroundImageUrl: row.background_image_url ?? undefined,
+    theme,
+    collaboratorPassword: undefined, // never send password to client
+    adminIds: row.admin_ids ?? [],
+    collaboratorIds: row.collaborator_ids ?? [],
+    publicView: row.public_view ?? true,
+    themeId: row.theme_id ?? undefined,
+    invitedAdminEmails: row.invited_admin_emails ?? undefined,
+    invitedCollaboratorEmails: row.invited_collaborator_emails ?? undefined,
+    nodeSizeScale: row.node_size_scale ?? undefined,
+    nodeLabelFontScale: row.node_label_font_scale ?? undefined,
+  };
+}
+
+export function dbNodeToMapNode(row: DbNode): MapNode {
+  return {
+    id: row.id,
+    type: row.type as MapNode['type'],
+    title: row.title ?? '',
+    description: row.description ?? '',
+    website: row.website ?? undefined,
+    x: Number(row.x),
+    y: Number(row.y),
+    tags: row.tags ?? [],
+    primaryTag: row.primary_tag ?? '',
+    collaboratorId: row.collaborator_id ?? '',
+    status: row.status === 'pending' ? 'pending' : 'approved',
+  };
+}
+
+// --- App -> Row (for insert/update) ---
+
+export function sceneMapToDbMap(m: SceneMap): Omit<DbMap, 'created_at' | 'updated_at'> {
+  const theme = m.theme && typeof m.theme === 'object' && 'primaryColor' in m.theme
+    ? m.theme
+    : DEFAULT_THEME;
+  return {
+    id: m.id,
+    slug: m.slug,
+    title: m.title ?? '',
+    description: m.description ?? '',
+    background_image_url: m.backgroundImageUrl ?? null,
+    theme,
+    collaborator_password_hash: null, // set separately when storing password hash
+    admin_ids: m.adminIds ?? [],
+    collaborator_ids: m.collaboratorIds ?? [],
+    public_view: m.publicView ?? true,
+    theme_id: m.themeId ?? null,
+    invited_admin_emails: m.invitedAdminEmails ?? null,
+    invited_collaborator_emails: m.invitedCollaboratorEmails ?? null,
+    node_size_scale: m.nodeSizeScale ?? null,
+    node_label_font_scale: m.nodeLabelFontScale ?? null,
+  };
+}
+
+export function mapNodeToDbNode(n: MapNode, mapId: string): Omit<DbNode, 'created_at' | 'updated_at'> {
+  return {
+    id: n.id,
+    map_id: mapId,
+    type: n.type,
+    title: n.title ?? '',
+    description: n.description ?? '',
+    website: n.website ?? null,
+    x: n.x,
+    y: n.y,
+    tags: n.tags ?? [],
+    primary_tag: n.primaryTag ?? '',
+    collaborator_id: n.collaboratorId ?? '',
+    status: n.status ?? 'approved',
+  };
+}
