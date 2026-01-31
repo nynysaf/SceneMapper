@@ -30,16 +30,33 @@ function guard(): void {
   }
 }
 
+/** Options for data-layer fetches; pass signal to cancel on unmount/navigation. */
+export interface DataLayerOptions {
+  signal?: AbortSignal;
+}
+
+/** True when the error is from an aborted fetch (e.g. navigation/unmount). Don't treat as real error. */
+export function isAbortError(err: unknown): boolean {
+  return err instanceof DOMException && err.name === 'AbortError';
+}
+
 // --- Maps (backend) ---
 
-async function getMapsApi(): Promise<SceneMap[]> {
-  const r = await fetch(`${apiBase()}/api/maps`, { ...fetchOpts('GET'), credentials: 'include' });
+async function getMapsApi(options?: DataLayerOptions): Promise<SceneMap[]> {
+  const r = await fetch(`${apiBase()}/api/maps`, {
+    ...fetchOpts('GET'),
+    credentials: 'include',
+    signal: options?.signal,
+  });
   if (!r.ok) throw new Error(`getMaps: ${r.status}`);
   return r.json();
 }
 
-async function getMapBySlugApi(slug: string): Promise<SceneMap | null> {
-  const r = await fetch(`${apiBase()}/api/maps/${encodeURIComponent(slug)}`, { credentials: 'include' });
+async function getMapBySlugApi(slug: string, options?: DataLayerOptions): Promise<SceneMap | null> {
+  const r = await fetch(`${apiBase()}/api/maps/${encodeURIComponent(slug)}`, {
+    credentials: 'include',
+    signal: options?.signal,
+  });
   if (r.status === 404) return null;
   if (!r.ok) throw new Error(`getMapBySlug: ${r.status}`);
   return r.json();
@@ -52,8 +69,11 @@ async function saveMapsApi(maps: SceneMap[]): Promise<void> {
 
 // --- Nodes (backend) ---
 
-async function getNodesApi(mapSlug: string): Promise<MapNode[]> {
-  const r = await fetch(`${apiBase()}/api/maps/${encodeURIComponent(mapSlug)}/nodes`, { credentials: 'include' });
+async function getNodesApi(mapSlug: string, options?: DataLayerOptions): Promise<MapNode[]> {
+  const r = await fetch(`${apiBase()}/api/maps/${encodeURIComponent(mapSlug)}/nodes`, {
+    credentials: 'include',
+    signal: options?.signal,
+  });
   if (!r.ok) throw new Error(`getNodes: ${r.status}`);
   return r.json();
 }
@@ -65,8 +85,11 @@ async function saveNodesApi(mapSlug: string, nodes: MapNode[]): Promise<void> {
 
 // --- Connections (backend) ---
 
-async function getConnectionsApi(mapSlug: string): Promise<MapConnection[]> {
-  const r = await fetch(`${apiBase()}/api/maps/${encodeURIComponent(mapSlug)}/connections`, { credentials: 'include' });
+async function getConnectionsApi(mapSlug: string, options?: DataLayerOptions): Promise<MapConnection[]> {
+  const r = await fetch(`${apiBase()}/api/maps/${encodeURIComponent(mapSlug)}/connections`, {
+    credentials: 'include',
+    signal: options?.signal,
+  });
   if (!r.ok) throw new Error(`getConnections: ${r.status}`);
   return r.json();
 }
@@ -129,15 +152,15 @@ function safeJson<T>(raw: string | null, fallback: T): T {
 
 // --- Public API: Maps ---
 
-export async function getMaps(): Promise<SceneMap[]> {
+export async function getMaps(options?: DataLayerOptions): Promise<SceneMap[]> {
   guard();
-  if (USE_BACKEND) return getMapsApi();
+  if (USE_BACKEND) return getMapsApi(options);
   return safeJson<SceneMap[]>(localStorage.getItem(KEY_MAPS), []);
 }
 
-export async function getMapBySlug(slug: string): Promise<SceneMap | null> {
+export async function getMapBySlug(slug: string, options?: DataLayerOptions): Promise<SceneMap | null> {
   guard();
-  if (USE_BACKEND) return getMapBySlugApi(slug);
+  if (USE_BACKEND) return getMapBySlugApi(slug, options);
   const maps = await safeJson<SceneMap[]>(localStorage.getItem(KEY_MAPS), []);
   return maps.find((m) => m.slug === slug) ?? null;
 }
@@ -181,9 +204,9 @@ export async function copyNodesToSlug(fromSlug: string, toSlug: string): Promise
 
 // --- Public API: Connections ---
 
-export async function getConnections(mapSlug: string): Promise<MapConnection[]> {
+export async function getConnections(mapSlug: string, options?: DataLayerOptions): Promise<MapConnection[]> {
   guard();
-  if (USE_BACKEND) return getConnectionsApi(mapSlug);
+  if (USE_BACKEND) return getConnectionsApi(mapSlug, options);
   const key = connectionStorageKey(mapSlug);
   return safeJson<MapConnection[]>(localStorage.getItem(key), []);
 }

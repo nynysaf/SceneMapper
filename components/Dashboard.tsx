@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { User, SceneMap, MapTheme } from '../types';
 import { NodeType } from '../types';
-import { getMaps, saveMaps, copyNodesToSlug, saveNodes } from '../lib/data';
+import { getMaps, saveMaps, copyNodesToSlug, saveNodes, isAbortError } from '../lib/data';
 import {
   DEFAULT_ADMIN_SUBJECT,
   DEFAULT_ADMIN_BODY,
@@ -243,11 +243,15 @@ const Dashboard: React.FC<DashboardProps> = ({
     return copy;
   }, [maps, mapListSort]);
 
-  // Hydrate maps from data layer
+  // Hydrate maps from data layer (abort on unmount so we don't overwrite state after navigation)
   useEffect(() => {
-    getMaps()
+    const ac = new AbortController();
+    getMaps({ signal: ac.signal })
       .then(setMaps)
-      .catch(() => setMaps([]));
+      .catch((err) => {
+        if (!isAbortError(err)) setMaps([]);
+      });
+    return () => ac.abort();
   }, []);
 
   // If we arrive with an ?edit=slug query, populate the form for that map

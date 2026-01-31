@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { MapNode, MapConnection, NodeType, UserSession, MapTheme, SceneMap, User, AuthSession } from '../types';
 import { INITIAL_NODES, CATEGORY_COLORS } from '../constants';
-import { getNodes as loadNodes, saveNodes as persistNodes, getConnections as loadConnections, saveConnections as persistConnections, getUsers, getSession, getMaps, getMapBySlug, saveMaps } from '../lib/data';
+import { getNodes as loadNodes, saveNodes as persistNodes, getConnections as loadConnections, saveConnections as persistConnections, getUsers, getSession, getMaps, getMapBySlug, saveMaps, isAbortError } from '../lib/data';
 import Map from './Map';
 import Sidebar from './Sidebar';
 import SubmissionModal from './SubmissionModal';
@@ -113,7 +113,8 @@ const MapExperience: React.FC<MapExperienceProps> = ({
 
   // Load map display settings (node size / font scale / enabled types) so all viewers see the same
   useEffect(() => {
-    getMapBySlug(effectiveSlug).then((map) => {
+    const ac = new AbortController();
+    getMapBySlug(effectiveSlug, { signal: ac.signal }).then((map) => {
       if (map) {
         setNodeSizeScale(map.nodeSizeScale ?? 1);
         setNodeLabelFontScale(map.nodeLabelFontScale ?? 1);
@@ -126,31 +127,41 @@ const MapExperience: React.FC<MapExperienceProps> = ({
         setConnectionsEnabled(map.connectionsEnabled !== false);
         setActiveFilters((prev) => prev.filter((t) => enabled.includes(t)));
       }
-    });
+    }).catch((err) => { if (!isAbortError(err)) { /* ignore abort on unmount */ } });
+    return () => ac.abort();
   }, [effectiveSlug]);
 
-  // Load nodes from data layer
+  // Load nodes from data layer (abort on unmount so we don't overwrite state after navigation)
   useEffect(() => {
-    loadNodes(effectiveSlug)
+    const ac = new AbortController();
+    loadNodes(effectiveSlug, { signal: ac.signal })
       .then((loaded) => {
         setNodes(loaded.length ? loaded : effectiveSlug === 'torontopia' ? INITIAL_NODES : []);
       })
-      .catch(() => setNodes(effectiveSlug === 'torontopia' ? INITIAL_NODES : []));
+      .catch((err) => {
+        if (!isAbortError(err)) setNodes(effectiveSlug === 'torontopia' ? INITIAL_NODES : []);
+      });
+    return () => ac.abort();
   }, [effectiveSlug]);
 
-  // Load connections from data layer
+  // Load connections from data layer (abort on unmount so we don't overwrite state after navigation)
   useEffect(() => {
-    loadConnections(effectiveSlug)
+    const ac = new AbortController();
+    loadConnections(effectiveSlug, { signal: ac.signal })
       .then(setConnections)
-      .catch(() => setConnections([]));
+      .catch((err) => {
+        if (!isAbortError(err)) setConnections([]);
+      });
+    return () => ac.abort();
   }, [effectiveSlug]);
 
-  // Hydrate user role from data layer
+  // Hydrate user role from data layer (abort on unmount)
   useEffect(() => {
-    let cancelled = false;
-    Promise.all([getUsers(), getSession(), getMapBySlug(effectiveSlug)])
+    const ac = new AbortController();
+    const opts = { signal: ac.signal };
+    Promise.all([getUsers(), getSession(), getMapBySlug(effectiveSlug, opts)])
       .then(([users, session, sceneMap]) => {
-        if (cancelled || !session) return;
+        if (ac.signal.aborted || !session) return;
         const currentUser = users.find((u) => u.id === session.userId);
         if (!currentUser) return;
 
@@ -168,10 +179,8 @@ const MapExperience: React.FC<MapExperienceProps> = ({
           role,
         });
       })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
+      .catch((err) => { if (!isAbortError(err)) { /* ignore */ } });
+    return () => ac.abort();
   }, [effectiveSlug]);
 
   const saveNodes = useCallback(

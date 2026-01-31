@@ -3,7 +3,7 @@
 import { use, useEffect, useMemo, useState } from 'react';
 import MapExperience from '../../../components/MapExperience';
 import type { SceneMap } from '../../../types';
-import { getMapBySlug } from '../../../lib/data';
+import { getMapBySlug, isAbortError } from '../../../lib/data';
 
 /**
  * Next.js App Router page for individual Scene Mapper maps.
@@ -17,9 +17,13 @@ export default function MapPage({ params }: { params: Promise<{ slug: string }> 
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    getMapBySlug(slug)
+    const ac = new AbortController();
+    getMapBySlug(slug, { signal: ac.signal })
       .then(setMap)
-      .catch(() => setMap(null));
+      .catch((err) => {
+        if (!isAbortError(err)) setMap(null);
+      });
+    return () => ac.abort();
   }, [slug]);
 
   const { title, subtitle, backgroundImageUrl, theme, description } = useMemo(() => {
