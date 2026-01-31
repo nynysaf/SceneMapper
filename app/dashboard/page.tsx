@@ -33,6 +33,28 @@ export default function DashboardPage() {
   };
 
   const handleSignup = async (name: string, email: string, password: string) => {
+    const useBackend = process.env.NEXT_PUBLIC_USE_BACKEND === 'true';
+
+    if (useBackend) {
+      try {
+        const r = await fetch('/api/users', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: name.trim() || 'Explorer', email: email.trim(), password }),
+        });
+        const data = await r.json();
+        if (!r.ok) {
+          return { ok: false as const, error: (data as { error?: string }).error || 'Signup failed' };
+        }
+        const user = (data as { user?: User }).user;
+        if (user) setCurrentUser({ ...user, password: '' });
+        return { ok: true as const };
+      } catch {
+        return { ok: false as const, error: 'Network error. Please try again.' };
+      }
+    }
+
     const users = await getUsers();
     const existing = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
     if (existing) {
@@ -53,6 +75,31 @@ export default function DashboardPage() {
   };
 
   const handleLogin = async (email: string, password: string) => {
+    const useBackend = process.env.NEXT_PUBLIC_USE_BACKEND === 'true';
+
+    if (useBackend) {
+      try {
+        const r = await fetch('/api/auth/login', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email.trim(), password }),
+        });
+        const data = await r.json();
+        if (!r.ok) {
+          return { ok: false as const, error: (data as { error?: string }).error || 'Invalid email or password.' };
+        }
+        const userId = (data as { userId?: string }).userId;
+        if (!userId) return { ok: false as const, error: 'Invalid response from server.' };
+        const users = await getUsers();
+        const user = users.find((u) => u.id === userId) ?? null;
+        if (user) setCurrentUser(user);
+        return { ok: true as const };
+      } catch {
+        return { ok: false as const, error: 'Network error. Please try again.' };
+      }
+    }
+
     const users = await getUsers();
     const user = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
 
