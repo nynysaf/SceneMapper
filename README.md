@@ -18,3 +18,7 @@ View your app in AI Studio: https://ai.studio/apps/drive/1_OP47iK8r-vGRrLFOmT7ol
 2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
 3. Run the app:
    `npm run dev`
+
+## Before deploy
+
+Run **`npm run build`** (or **`npm run verify`**) before pushing to the branch that Vercel deploys. If the build fails, fix the error before pushing so production stays green. See [docs/ZERO_DISCREPANCY_STRATEGY.md](docs/ZERO_DISCREPANCY_STRATEGY.md) for the full step-by-step strategy to zero discrepancies.
