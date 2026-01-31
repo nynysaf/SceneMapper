@@ -12,7 +12,7 @@ SceneMapper is an interactive, crowd-sourced map application for building "scene
   - `Collaborator`: Can submit (auto-approved) and move their own nodes.
   - `Admin`: Full moderation capabilities, can move all nodes, and manage the approval queue.
 - **Moderation Workflow:** Real-time "Inbox" for admins to approve or deny user-submitted entries.
-- **Persistence:** Data goes through **`lib/data.ts`** (localStorage-backed); **`app/api/`** routes exist as stubs for a future backend (Supabase).
+- **Persistence:** Data goes through **`lib/data.ts`**; when **`NEXT_PUBLIC_USE_BACKEND=true`**, it uses **Supabase** via **`app/api/`** routes (maps, nodes, connections, users, auth). LocalStorage is used when the backend is off (e.g. local dev without env).
 - **Dashboard:** Create/edit map, list "YOUR MAPS" (hidden when no maps), copy link, QR code, delete with confirm, sort A–Z / Z–A, role labels (Admin/Collaborator/Viewed).
 - **Map view:** Node popup on click only (not on drag), share (copy link, QR), admin-only node size and label font sliders (persisted).
 - **Landing:** Featured maps section, logo image + fallback, "Why scene mapping?" link; copy updated (Map your scene your way, etc.).
@@ -27,15 +27,16 @@ SceneMapper is an interactive, crowd-sourced map application for building "scene
 ## Recent session progress (to pick up)
 - **Create/Edit map screens:** Title "Map your scene, your way." (create) / "Edit your map" (edit). Body copy: "Build your map to inspire your scene..." with bold **name**, **Describe**, **background image** bullets. Left column has "YOUR MAPS" section (only when user has maps). Solarpunk Emerald theme description: "Bright greens, warm neutrals – like nature on M" (no Torontopia mention).
 
-## Version control
-- No git repository in the project yet. To save progress in future: `git init`, add a `.gitignore` (e.g. `node_modules`, `.next`, `.env*.local`), then commit.
+## Version control & deployment
+- **Git:** Repo on GitHub; **Vercel** for hosting; **Supabase** for DB. See **`docs/DEPLOYMENT_SEQUENCE.md`** for the full sequence. **Resend** is used for invitation emails when admins/collaborators add emails and save the map.
+- **Map download:** Users can download the map as PNG, JPEG, or PDF from the Share section (full map + title/date overlay). **Edit invitation email** in the dashboard lets admins customize subject/body and sender name per map.
 
 ## Next Steps / Technical Debt
-1. **Backend Integration:** Replace LocalStorage with a persistent database (e.g., Supabase, Firestore).
-2. **Authentication:** Implement a real Auth provider to replace the current role-toggle simulation.
-3. **Multimedia Support:** Add image upload fields for nodes to create a richer visual experience.
-4. **Mobile Polish:** While responsive, the D3 zoom/pan could be further optimized for multi-touch gestures.
-5. **Real-time Updates:** Implement WebSockets or similar to allow users to see others adding nodes in real-time.
+1. **Authentication:** Implement a real Auth provider (e.g. Supabase Auth or NextAuth) to replace the current role-toggle simulation; tie roles to real users.
+2. **Multimedia Support:** Add image upload fields for nodes to create a richer visual experience.
+3. **Mobile Polish:** While responsive, the D3 zoom/pan could be further optimized for multi-touch gestures.
+4. **Real-time Updates:** Implement WebSockets or similar to allow users to see others adding nodes in real-time.
+5. **Custom Domain:** Add your own domain in Vercel when ready; Resend can then use a verified from-address (e.g. `invitations@yourdomain.com`).
 
 ## Design Aesthetic
 - **Solarpunk Theme:** Uses a palette of emerald greens, amber golds, and sky blues. 

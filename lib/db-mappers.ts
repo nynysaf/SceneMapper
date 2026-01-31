@@ -36,6 +36,9 @@ export interface DbMap {
   invitation_sender_name: string | null;
   node_size_scale: number | null;
   node_label_font_scale: number | null;
+  region_font_scale: number | null;
+  enabled_node_types: string[] | null;
+  connections_enabled: boolean | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -173,6 +176,9 @@ export function sceneMapToDbMap(m: SceneMap): Omit<DbMap, 'created_at' | 'update
     invitation_sender_name: m.invitationSenderName ?? null,
     node_size_scale: m.nodeSizeScale ?? null,
     node_label_font_scale: m.nodeLabelFontScale ?? null,
+    region_font_scale: m.regionFontScale ?? null,
+    enabled_node_types: m.enabledNodeTypes?.length ? m.enabledNodeTypes : null,
+    connections_enabled: m.connectionsEnabled ?? null,
   };
 }
 

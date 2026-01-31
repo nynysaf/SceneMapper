@@ -1082,6 +1082,11 @@ const Dashboard: React.FC<DashboardProps> = ({
                           setCollaboratorPassword(map.collaboratorPassword || '');
                           setInvitedAdmins((map.invitedAdminEmails || []).join(', '));
                           setInvitedCollaborators((map.invitedCollaboratorEmails || []).join(', '));
+                          setInvitationEmailSubjectAdmin(map.invitationEmailSubjectAdmin ?? '');
+                          setInvitationEmailBodyAdmin(map.invitationEmailBodyAdmin ?? '');
+                          setInvitationEmailSubjectCollaborator(map.invitationEmailSubjectCollaborator ?? '');
+                          setInvitationEmailBodyCollaborator(map.invitationEmailBodyCollaborator ?? '');
+                          setInvitationSenderName(map.invitationSenderName ?? '');
                           setBaseThemeId(map.themeId || DEFAULT_THEME.id);
                           const preset = THEME_PRESETS.find((p) => p.id === map.themeId) ?? DEFAULT_THEME;
                           const theme = map.theme || preset.theme;
@@ -1096,6 +1101,12 @@ const Dashboard: React.FC<DashboardProps> = ({
                             setCustomConnectionLineOpacity(theme.connectionLine.opacity);
                             setCustomConnectionLineThickness(theme.connectionLine.thickness);
                           }
+                          setEnabledNodeTypes(
+                            map.enabledNodeTypes && map.enabledNodeTypes.length > 0
+                              ? map.enabledNodeTypes
+                              : Object.values(NodeType),
+                          );
+                          setConnectionsEnabled(map.connectionsEnabled !== false);
                         }}
                         className="p-1.5 rounded-lg text-emerald-700 hover:bg-emerald-100 transition-colors"
                         title="Edit map"
