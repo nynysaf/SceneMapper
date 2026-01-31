@@ -301,7 +301,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   const persistMaps = (next: SceneMap[]) => {
     setMaps(next);
-    void saveMaps(next);
+    return saveMaps(next);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -467,7 +467,19 @@ const Dashboard: React.FC<DashboardProps> = ({
       nextMaps = [...maps, newMap];
       targetMapId = newMap.id;
     }
-    persistMaps(nextMaps);
+    // When using backend, wait for POST to complete before navigating so the
+    // request is not aborted (NS_BINDING_ABORTED) when the page unloads.
+    const useBackend = typeof process !== 'undefined' && process.env.NEXT_PUBLIC_USE_BACKEND === 'true';
+    if (useBackend) {
+      try {
+        await persistMaps(nextMaps);
+      } catch (err) {
+        setMapError(err instanceof Error ? err.message : 'Could not save map. Please try again.');
+        return;
+      }
+    } else {
+      persistMaps(nextMaps);
+    }
 
     // Initialize or migrate node collection for this map
     const oldSlug = editingOriginalSlug && editingMapId ? editingOriginalSlug : null;
