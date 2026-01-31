@@ -37,6 +37,10 @@ Use this to record results from **Part 1: Diagnostics** in `docs/PLAN_OF_ACTION.
 
 ---
 
+**Follow-up (POST 500 after await fix):** User reported POST /api/maps **500** on Create map; map appears in "Your maps" (optimistic state) but clicking it gives "Map not found". **Root cause:** New maps used `id: Math.random().toString(36).slice(2)` (e.g. `k3j5h2g1`); `maps.id` in DB is **uuid**; Postgres rejected non-UUID. **Fix:** Client uses `crypto.randomUUID()` for new map id; API normalizes non-UUID ids to UUID before upsert; client surfaces API error message on save failure.
+
+---
+
 ## D4. Supabase schema vs migrations
 
 - [ ] Tables: `users`, `maps`, `nodes`, `connections`

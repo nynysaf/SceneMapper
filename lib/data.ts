@@ -64,7 +64,11 @@ async function getMapBySlugApi(slug: string, options?: DataLayerOptions): Promis
 
 async function saveMapsApi(maps: SceneMap[]): Promise<void> {
   const r = await fetch(`${apiBase()}/api/maps`, fetchOpts('POST', maps));
-  if (!r.ok) throw new Error(`saveMaps: ${r.status}`);
+  if (!r.ok) {
+    const body = await r.json().catch(() => ({}));
+    const msg = typeof (body as { error?: string }).error === 'string' ? (body as { error: string }).error : `saveMaps: ${r.status}`;
+    throw new Error(msg);
+  }
 }
 
 // --- Nodes (backend) ---

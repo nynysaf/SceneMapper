@@ -29,6 +29,13 @@ function normalizeEmails(list: string[] | undefined): string[] {
   return list.map((e) => e.trim().toLowerCase()).filter(Boolean);
 }
 
+/** PostgreSQL maps.id is uuid; reject non-UUID to avoid 500 on upsert. */
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+function ensureUuid(id: string | undefined): string {
+  if (id && UUID_REGEX.test(id)) return id;
+  return crypto.randomUUID();
+}
+
 /**
  * POST /api/maps
  * Create or replace maps. Body: SceneMap[] or single SceneMap.
@@ -43,7 +50,7 @@ export async function POST(request: NextRequest) {
     }
     const maps: SceneMap[] = rawMaps.map((m: SceneMap & { collaboratorPassword?: string }) => ({
       ...m,
-      id: m.id || crypto.randomUUID(),
+      id: ensureUuid(m.id),
     }));
 
     // Fetch existing maps (by id) to diff invited emails before upsert

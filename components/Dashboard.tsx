@@ -450,7 +450,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       );
     } else {
       const newMap: SceneMap = {
-        id: Math.random().toString(36).slice(2),
+        id: crypto.randomUUID(),
         slug,
         title,
         description: baseFields.description || '',
