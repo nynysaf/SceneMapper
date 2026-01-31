@@ -48,6 +48,20 @@ interface MapExperienceProps {
    * "About" section.
    */
   mapDescription?: string;
+  /**
+   * Pre-fetched nodes from page (Tier 2: parallel fetch at page level).
+   * When provided, MapExperience uses these instead of fetching.
+   */
+  initialNodes?: MapNode[];
+  /**
+   * Pre-fetched connections from page (Tier 2).
+   * When provided, MapExperience uses these instead of fetching.
+   */
+  initialConnections?: MapConnection[];
+  /**
+   * When true, page is still loading data; show loading state and don't fetch.
+   */
+  isDataLoading?: boolean;
 }
 
 /**
@@ -66,6 +80,9 @@ const MapExperience: React.FC<MapExperienceProps> = ({
   mapBackgroundImageUrl,
   mapTheme,
   mapDescription,
+  initialNodes,
+  initialConnections,
+  isDataLoading = false,
 }) => {
   const effectiveSlug =
     mapSlug ??
@@ -133,10 +150,49 @@ const MapExperience: React.FC<MapExperienceProps> = ({
     }
   }, [map]);
 
-  // Single load effect: nodes, connections, users, session in one parallel batch (abort on unmount)
+  // Clear nodes/connections when page is loading (e.g. slug change) to avoid stale data
   useEffect(() => {
+    if (isDataLoading) {
+      setNodes([]);
+      setConnections([]);
+      return;
+    }
+  }, [isDataLoading]);
+
+  // Load effect: when page provides data (initialNodes), use it; else fetch. Always hydrate role.
+  useEffect(() => {
+    if (isDataLoading) return;
+
     const ac = new AbortController();
     const opts = { signal: ac.signal };
+
+    const applyRole = (users: Awaited<ReturnType<typeof getUsers>>, session: Awaited<ReturnType<typeof getSession>>) => {
+      if (ac.signal.aborted || !session) return;
+      const currentUser = users.find((u) => u.id === session.userId);
+      if (!currentUser) return;
+      let role: UserSession['role'] = 'public';
+      if (map) {
+        setHasCollaboratorPassword(!!map.collaboratorPassword);
+        if (map.adminIds.includes(currentUser.id)) role = 'admin';
+        else if (map.collaboratorIds.includes(currentUser.id)) role = 'collaborator';
+      }
+      setUserSession({
+        id: currentUser.id,
+        email: currentUser.email,
+        name: currentUser.name || currentUser.email,
+        role,
+      });
+    };
+
+    if (initialNodes !== undefined && initialConnections !== undefined) {
+      setNodes(initialNodes);
+      setConnections(initialConnections);
+      Promise.all([getUsers(), getSession()])
+        .then(([users, session]) => { if (!ac.signal.aborted) applyRole(users, session); })
+        .catch(() => { /* ignore */ });
+      return () => ac.abort();
+    }
+
     Promise.all([
       loadNodes(effectiveSlug, opts),
       loadConnections(effectiveSlug, opts),
@@ -145,29 +201,11 @@ const MapExperience: React.FC<MapExperienceProps> = ({
     ])
       .then(([loadedNodes, loadedConnections, users, session]) => {
         if (ac.signal.aborted) return;
-
         setNodes(
           loadedNodes.length ? loadedNodes : effectiveSlug === 'torontopia' ? INITIAL_NODES : []
         );
         setConnections(loadedConnections);
-
-        if (session) {
-          const currentUser = users.find((u) => u.id === session.userId);
-          if (currentUser) {
-            let role: UserSession['role'] = 'public';
-            if (map) {
-              setHasCollaboratorPassword(!!map.collaboratorPassword);
-              if (map.adminIds.includes(currentUser.id)) role = 'admin';
-              else if (map.collaboratorIds.includes(currentUser.id)) role = 'collaborator';
-            }
-            setUserSession({
-              id: currentUser.id,
-              email: currentUser.email,
-              name: currentUser.name || currentUser.email,
-              role,
-            });
-          }
-        }
+        applyRole(users, session);
       })
       .catch((err) => {
         if (isAbortError(err)) return;
@@ -175,7 +213,7 @@ const MapExperience: React.FC<MapExperienceProps> = ({
         setConnections([]);
       });
     return () => ac.abort();
-  }, [effectiveSlug, map]);
+  }, [effectiveSlug, map, isDataLoading, initialNodes, initialConnections]);
 
   const saveNodes = useCallback(
     (newNodes: MapNode[]) => {
@@ -788,6 +826,13 @@ const MapExperience: React.FC<MapExperienceProps> = ({
 
       {/* --- Main Map Area --- */}
       <main className={`flex-1 relative bg-[#e0f2f1] ${pendingNode ? 'cursor-crosshair' : ''}`}>
+        {isDataLoading && (
+          <div className="absolute inset-0 z-40 flex items-center justify-center bg-[#e0f2f1]/90 backdrop-blur-sm">
+            <div className="glass px-6 py-4 rounded-2xl solarpunk-shadow text-emerald-800 font-semibold">
+              Loading map…
+            </div>
+          </div>
+        )}
         <Map
           nodes={filteredNodes}
           onNodeMove={handleNodeMove}

@@ -2,32 +2,48 @@
 
 import { use, useEffect, useMemo, useState } from 'react';
 import MapExperience from '../../../components/MapExperience';
-import type { SceneMap } from '../../../types';
-import { getMapBySlug, isAbortError } from '../../../lib/data';
+import type { SceneMap, MapNode, MapConnection } from '../../../types';
+import { getMapBySlug, getNodes, getConnections, isAbortError } from '../../../lib/data';
+import { INITIAL_NODES } from '../../../constants';
 
 /**
  * Next.js App Router page for individual Scene Mapper maps.
  *
- * This keeps the existing Torontopia behavior while allowing
- * additional maps to be accessed via /maps/:slug.
+ * Tier 2: Fetches map, nodes, connections in parallel at page level.
+ * Renders MapExperience shell immediately with loading state.
  */
 export default function MapPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
   const [map, setMap] = useState<SceneMap | null>(null);
+  const [nodes, setNodes] = useState<MapNode[] | null>(null);
+  const [connections, setConnections] = useState<MapConnection[] | null>(null);
   const [loaded, setLoaded] = useState(false);
 
+  // Parallel fetch: map, nodes, connections in one batch (abort on unmount)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     setLoaded(false);
     const ac = new AbortController();
-    getMapBySlug(slug, { signal: ac.signal })
-      .then((m) => {
+    const opts = { signal: ac.signal };
+    Promise.all([
+      getMapBySlug(slug, opts),
+      getNodes(slug, opts),
+      getConnections(slug, opts),
+    ])
+      .then(([m, loadedNodes, loadedConnections]) => {
+        if (ac.signal.aborted) return;
         setMap(m);
+        setNodes(
+          loadedNodes.length ? loadedNodes : slug === 'torontopia' ? INITIAL_NODES : []
+        );
+        setConnections(loadedConnections);
         setLoaded(true);
       })
       .catch((err) => {
         if (!isAbortError(err)) {
           setMap(null);
+          setNodes(slug === 'torontopia' ? INITIAL_NODES : []);
+          setConnections([]);
           setLoaded(true);
         }
       });
@@ -87,6 +103,7 @@ export default function MapPage({ params }: { params: Promise<{ slug: string }> 
     );
   }
 
+  // Render MapExperience shell immediately; pass data when loaded (Tier 2: show shell first)
   return (
     <MapExperience
       map={map}
@@ -96,6 +113,9 @@ export default function MapPage({ params }: { params: Promise<{ slug: string }> 
       mapBackgroundImageUrl={backgroundImageUrl}
       mapTheme={theme}
       mapDescription={description}
+      initialNodes={nodes ?? undefined}
+      initialConnections={connections ?? undefined}
+      isDataLoading={!loaded}
     />
   );
 }
