@@ -62,6 +62,21 @@ async function getMapBySlugApi(slug: string, options?: DataLayerOptions): Promis
   return r.json();
 }
 
+export interface MapPageData {
+  map: SceneMap | null;
+  nodes: MapNode[];
+  connections: MapConnection[];
+}
+
+async function getMapPageDataApi(slug: string, options?: DataLayerOptions): Promise<MapPageData> {
+  const r = await fetch(`${apiBase()}/api/maps/${encodeURIComponent(slug)}/page`, {
+    credentials: 'include',
+    signal: options?.signal,
+  });
+  if (!r.ok) throw new Error(`getMapPageData: ${r.status}`);
+  return r.json();
+}
+
 async function saveMapsApi(maps: SceneMap[]): Promise<void> {
   const r = await fetch(`${apiBase()}/api/maps`, fetchOpts('POST', maps));
   if (!r.ok) {
@@ -167,6 +182,21 @@ export async function getMapBySlug(slug: string, options?: DataLayerOptions): Pr
   if (USE_BACKEND) return getMapBySlugApi(slug, options);
   const maps = await safeJson<SceneMap[]>(localStorage.getItem(KEY_MAPS), []);
   return maps.find((m) => m.slug === slug) ?? null;
+}
+
+/**
+ * Tier 3: Combined API - map, nodes, connections in one response (one HTTP round-trip).
+ * Use for map page initial load; keeps existing GET /api/maps/[slug], nodes, connections for edit/save flows.
+ */
+export async function getMapPageData(slug: string, options?: DataLayerOptions): Promise<MapPageData> {
+  guard();
+  if (USE_BACKEND) return getMapPageDataApi(slug, options);
+  const [map, nodes, connections] = await Promise.all([
+    getMapBySlug(slug, options),
+    getNodes(slug, options),
+    getConnections(slug, options),
+  ]);
+  return { map: map ?? null, nodes, connections };
 }
 
 export async function saveMaps(maps: SceneMap[]): Promise<void> {

@@ -3,13 +3,13 @@
 import { use, useEffect, useMemo, useState } from 'react';
 import MapExperience from '../../../components/MapExperience';
 import type { SceneMap, MapNode, MapConnection } from '../../../types';
-import { getMapBySlug, getNodes, getConnections, isAbortError } from '../../../lib/data';
+import { getMapPageData, isAbortError } from '../../../lib/data';
 import { INITIAL_NODES } from '../../../constants';
 
 /**
  * Next.js App Router page for individual Scene Mapper maps.
  *
- * Tier 2: Fetches map, nodes, connections in parallel at page level.
+ * Tier 3: One HTTP round-trip via GET /api/maps/[slug]/page (map + nodes + connections).
  * Renders MapExperience shell immediately with loading state.
  */
 export default function MapPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -19,18 +19,14 @@ export default function MapPage({ params }: { params: Promise<{ slug: string }> 
   const [connections, setConnections] = useState<MapConnection[] | null>(null);
   const [loaded, setLoaded] = useState(false);
 
-  // Parallel fetch: map, nodes, connections in one batch (abort on unmount)
+  // Tier 3: One HTTP round-trip via GET /api/maps/[slug]/page (or localStorage equiv)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     setLoaded(false);
     const ac = new AbortController();
     const opts = { signal: ac.signal };
-    Promise.all([
-      getMapBySlug(slug, opts),
-      getNodes(slug, opts),
-      getConnections(slug, opts),
-    ])
-      .then(([m, loadedNodes, loadedConnections]) => {
+    getMapPageData(slug, opts)
+      .then(({ map: m, nodes: loadedNodes, connections: loadedConnections }) => {
         if (ac.signal.aborted) return;
         setMap(m);
         setNodes(
