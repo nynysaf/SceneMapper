@@ -14,14 +14,22 @@ import { getMapBySlug, isAbortError } from '../../../lib/data';
 export default function MapPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
   const [map, setMap] = useState<SceneMap | null>(null);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    setLoaded(false);
     const ac = new AbortController();
     getMapBySlug(slug, { signal: ac.signal })
-      .then(setMap)
+      .then((m) => {
+        setMap(m);
+        setLoaded(true);
+      })
       .catch((err) => {
-        if (!isAbortError(err)) setMap(null);
+        if (!isAbortError(err)) {
+          setMap(null);
+          setLoaded(true);
+        }
       });
     return () => ac.abort();
   }, [slug]);
