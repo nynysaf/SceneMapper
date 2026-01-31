@@ -39,6 +39,8 @@ Use this to record results from **Part 1: Diagnostics** in `docs/PLAN_OF_ACTION.
 
 **Follow-up (POST 500 after await fix):** User reported POST /api/maps **500** on Create map; map appears in "Your maps" (optimistic state) but clicking it gives "Map not found". **Root cause:** New maps used `id: Math.random().toString(36).slice(2)` (e.g. `k3j5h2g1`); `maps.id` in DB is **uuid**; Postgres rejected non-UUID. **Fix:** Client uses `crypto.randomUUID()` for new map id; API normalizes non-UUID ids to UUID before upsert; client surfaces API error message on save failure.
 
+**If POST /api/maps still returns 500:** (1) In DevTools → Network → click the failed POST **maps** request → **Response** tab: copy the `error` message. (2) If it says a **column does not exist** (e.g. `region_font_scale`, `invitation_email_subject_admin`), run the missing migration(s) on the **production** Supabase project (see `docs/ENV_AND_MIGRATIONS_CHECKLIST.md` — all 4 migrations must be applied). (3) Confirm the latest Vercel deployment (with the UUID fix) is the one you’re hitting.
+
 ---
 
 ## D4. Supabase schema vs migrations

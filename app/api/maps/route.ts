@@ -53,27 +53,29 @@ export async function POST(request: NextRequest) {
       id: ensureUuid(m.id),
     }));
 
-    // Fetch existing maps (by id) to diff invited emails before upsert
+    // Fetch existing maps (by id) to diff invited emails before upsert.
+    // Use ensureUuid so we never pass a non-UUID to Postgres (avoids 500 when client sends old short ids).
     const existingById: Record<string, { invitedAdminEmails: string[]; invitedCollaboratorEmails: string[] }> = {};
     for (const m of maps) {
-      if (!m.id) continue;
+      const mapId = ensureUuid(m.id);
       const { data: existing } = await supabase
         .from('maps')
         .select('invited_admin_emails, invited_collaborator_emails')
-        .eq('id', m.id)
-        .single();
+        .eq('id', mapId)
+        .maybeSingle();
       if (existing) {
-        existingById[m.id] = {
+        existingById[mapId] = {
           invitedAdminEmails: normalizeEmails((existing as { invited_admin_emails?: string[] }).invited_admin_emails),
           invitedCollaboratorEmails: normalizeEmails((existing as { invited_collaborator_emails?: string[] }).invited_collaborator_emails),
         };
       } else {
-        existingById[m.id] = { invitedAdminEmails: [], invitedCollaboratorEmails: [] };
+        existingById[mapId] = { invitedAdminEmails: [], invitedCollaboratorEmails: [] };
       }
     }
 
     const rows = maps.map((m, i) => {
-      const row = sceneMapToDbMap(m);
+      const mapId = ensureUuid(m.id);
+      const row = { ...sceneMapToDbMap(m), id: mapId };
       const raw = rawMaps[i] as SceneMap & { collaboratorPassword?: string };
       if (raw?.collaboratorPassword != null && raw.collaboratorPassword !== '') {
         return { ...row, collaborator_password_hash: hashPassword(raw.collaboratorPassword) };
@@ -84,13 +86,15 @@ export async function POST(request: NextRequest) {
     const { error } = await supabase.from('maps').upsert(rows, { onConflict: 'id' });
     if (error) {
       console.error('POST /api/maps', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      const message = error.message || 'Database error';
+      return NextResponse.json({ error: message, code: error.code }, { status: 500 });
     }
 
     // Send invitation emails to newly added addresses (only when Resend is configured)
     const fromEmail = process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev';
     for (const m of maps) {
-      const prev = existingById[m.id] ?? { invitedAdminEmails: [], invitedCollaboratorEmails: [] };
+      const mapId = ensureUuid(m.id);
+      const prev = existingById[mapId] ?? { invitedAdminEmails: [], invitedCollaboratorEmails: [] };
       const currentAdmins = normalizeEmails(m.invitedAdminEmails);
       const currentCollaborators = normalizeEmails(m.invitedCollaboratorEmails);
       const newAdminEmails = currentAdmins.filter((e) => !prev.invitedAdminEmails.includes(e));
