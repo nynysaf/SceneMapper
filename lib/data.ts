@@ -176,9 +176,9 @@ export async function saveMaps(maps: SceneMap[]): Promise<void> {
 
 // --- Public API: Nodes ---
 
-export async function getNodes(mapSlug: string): Promise<MapNode[]> {
+export async function getNodes(mapSlug: string, options?: DataLayerOptions): Promise<MapNode[]> {
   guard();
-  if (USE_BACKEND) return getNodesApi(mapSlug);
+  if (USE_BACKEND) return getNodesApi(mapSlug, options);
   const key = nodeStorageKey(mapSlug);
   return safeJson<MapNode[]>(localStorage.getItem(key), []);
 }

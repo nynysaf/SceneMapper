@@ -5,6 +5,7 @@ export const metadata = {
   title: 'Scene Mapper',
   description:
     'Scene Mapper lets communities collaboratively map the people, spaces, events, and connections that compose their scene.',
+  icons: { icon: '/logo.png' },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

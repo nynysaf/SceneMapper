@@ -59,6 +59,26 @@ export default function MapPage({ params }: { params: Promise<{ slug: string }> 
     } as const;
   }, [slug, map]);
 
+  // Map not found (404 from API) – show message once load has finished
+  const mapNotFound = loaded && !map && slug !== 'torontopia';
+
+  if (mapNotFound) {
+    return (
+      <div className="min-h-screen bg-[#fdfcf0] flex flex-col items-center justify-center p-6 text-emerald-950">
+        <h1 className="text-xl font-bold text-emerald-900 mb-2">Map not found</h1>
+        <p className="text-emerald-800 mb-4 text-center max-w-md">
+          There is no map with the address <strong>/maps/{slug}</strong>. It may not exist in this environment yet, or the link may be outdated.
+        </p>
+        <a
+          href="/dashboard"
+          className="text-sm font-semibold text-emerald-700 hover:text-emerald-900 underline"
+        >
+          Go to Dashboard
+        </a>
+      </div>
+    );
+  }
+
   return (
     <MapExperience
       mapSlug={slug}
