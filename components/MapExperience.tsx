@@ -133,55 +133,47 @@ const MapExperience: React.FC<MapExperienceProps> = ({
     }
   }, [map]);
 
-  // Load nodes from data layer (abort on unmount so we don't overwrite state after navigation)
-  useEffect(() => {
-    const ac = new AbortController();
-    loadNodes(effectiveSlug, { signal: ac.signal })
-      .then((loaded) => {
-        setNodes(loaded.length ? loaded : effectiveSlug === 'torontopia' ? INITIAL_NODES : []);
-      })
-      .catch((err) => {
-        if (!isAbortError(err)) setNodes(effectiveSlug === 'torontopia' ? INITIAL_NODES : []);
-      });
-    return () => ac.abort();
-  }, [effectiveSlug]);
-
-  // Load connections from data layer (abort on unmount so we don't overwrite state after navigation)
-  useEffect(() => {
-    const ac = new AbortController();
-    loadConnections(effectiveSlug, { signal: ac.signal })
-      .then(setConnections)
-      .catch((err) => {
-        if (!isAbortError(err)) setConnections([]);
-      });
-    return () => ac.abort();
-  }, [effectiveSlug]);
-
-  // Hydrate user role from users + session; use passed map for adminIds/collaboratorIds (no duplicate getMapBySlug)
+  // Single load effect: nodes, connections, users, session in one parallel batch (abort on unmount)
   useEffect(() => {
     const ac = new AbortController();
     const opts = { signal: ac.signal };
-    Promise.all([getUsers(), getSession()])
-      .then(([users, session]) => {
-        if (ac.signal.aborted || !session) return;
-        const currentUser = users.find((u) => u.id === session.userId);
-        if (!currentUser) return;
+    Promise.all([
+      loadNodes(effectiveSlug, opts),
+      loadConnections(effectiveSlug, opts),
+      getUsers(),
+      getSession(),
+    ])
+      .then(([loadedNodes, loadedConnections, users, session]) => {
+        if (ac.signal.aborted) return;
 
-        let role: UserSession['role'] = 'public';
-        if (map) {
-          setHasCollaboratorPassword(!!map.collaboratorPassword);
-          if (map.adminIds.includes(currentUser.id)) role = 'admin';
-          else if (map.collaboratorIds.includes(currentUser.id)) role = 'collaborator';
+        setNodes(
+          loadedNodes.length ? loadedNodes : effectiveSlug === 'torontopia' ? INITIAL_NODES : []
+        );
+        setConnections(loadedConnections);
+
+        if (session) {
+          const currentUser = users.find((u) => u.id === session.userId);
+          if (currentUser) {
+            let role: UserSession['role'] = 'public';
+            if (map) {
+              setHasCollaboratorPassword(!!map.collaboratorPassword);
+              if (map.adminIds.includes(currentUser.id)) role = 'admin';
+              else if (map.collaboratorIds.includes(currentUser.id)) role = 'collaborator';
+            }
+            setUserSession({
+              id: currentUser.id,
+              email: currentUser.email,
+              name: currentUser.name || currentUser.email,
+              role,
+            });
+          }
         }
-
-        setUserSession({
-          id: currentUser.id,
-          email: currentUser.email,
-          name: currentUser.name || currentUser.email,
-          role,
-        });
       })
-      .catch((err) => { if (!isAbortError(err)) { /* ignore */ } });
+      .catch((err) => {
+        if (isAbortError(err)) return;
+        setNodes(effectiveSlug === 'torontopia' ? INITIAL_NODES : []);
+        setConnections([]);
+      });
     return () => ac.abort();
   }, [effectiveSlug, map]);
 
