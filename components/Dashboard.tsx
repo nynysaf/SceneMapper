@@ -486,7 +486,15 @@ const Dashboard: React.FC<DashboardProps> = ({
     if (oldSlug && oldSlug !== slug) {
       void copyNodesToSlug(oldSlug, slug);
     } else if (!editingMapId) {
-      void saveNodes(slug, []).catch(() => {});
+      if (useBackend) {
+        try {
+          await saveNodes(slug, []);
+        } catch {
+          // Non-blocking: map page will GET nodes and get [] anyway
+        }
+      } else {
+        void saveNodes(slug, []).catch(() => {});
+      }
     }
 
     setMapTitle('');

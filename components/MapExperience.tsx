@@ -289,7 +289,7 @@ const MapExperience: React.FC<MapExperienceProps> = ({
   const handleMapClick = (x: number, y: number) => {
     if (pendingNode) {
       const node: MapNode = {
-        id: Math.random().toString(36).substr(2, 9),
+        id: crypto.randomUUID(),
         type: pendingNode.type || NodeType.EVENT,
         title: pendingNode.title || 'Untitled',
         description: pendingNode.description || '',

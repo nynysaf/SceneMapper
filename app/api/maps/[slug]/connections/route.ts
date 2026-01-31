@@ -3,6 +3,12 @@ import type { MapConnection } from '@/types';
 import { supabase } from '@/lib/supabase-server';
 import { dbConnectionToMapConnection, mapConnectionToDbConnection } from '@/lib/db-mappers';
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+function ensureUuid(id: string | undefined): string {
+  if (id && UUID_REGEX.test(id)) return id;
+  return crypto.randomUUID();
+}
+
 type RouteContext = { params: Promise<{ slug: string }> };
 
 /**
@@ -56,7 +62,10 @@ export async function PUT(request: NextRequest, context: RouteContext) {
 
     await supabase.from('connections').delete().eq('map_id', mapId);
     if (connections.length > 0) {
-      const rows = connections.map((c) => mapConnectionToDbConnection(c, mapId));
+      const rows = connections.map((c) => {
+        const row = mapConnectionToDbConnection(c, mapId);
+        return { ...row, id: ensureUuid(c.id) };
+      });
       const { error: insertError } = await supabase.from('connections').insert(rows);
       if (insertError) {
         console.error('PUT /api/maps/[slug]/connections insert', insertError);

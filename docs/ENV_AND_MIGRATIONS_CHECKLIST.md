@@ -30,6 +30,7 @@ The Supabase project that `SUPABASE_URL` points to must have these migrations ap
 | `20250130000001_connections.sql` | connections table |
 | `20250130000002_invitation_emails.sql` | invitation email columns on maps |
 | `20250130000003_maps_display_options.sql` | region_font_scale, enabled_node_types, connections_enabled on maps |
+| `20250131000001_nodes_allow_region.sql` | allow REGION in nodes.type check |
 
 **How to apply:** Supabase Dashboard → SQL Editor → run each migration file contents, or use `supabase db push` if using Supabase CLI.
 
@@ -38,4 +39,4 @@ The Supabase project that `SUPABASE_URL` points to must have these migrations ap
 ## Quick verification
 
 - [ ] Vercel Production has all required env vars; redeploy after any change.
-- [ ] Production Supabase has all 4 migrations; API returns full map shape (theme, regionFontScale, enabledNodeTypes, connectionsEnabled).
+- [ ] Production Supabase has all 5 migrations; API returns full map shape (theme, regionFontScale, enabledNodeTypes, connectionsEnabled).
