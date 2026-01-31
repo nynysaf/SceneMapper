@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { MapNode, MapConnection, NodeType, UserSession, MapTheme, SceneMap, User, AuthSession } from '../types';
 import { INITIAL_NODES, CATEGORY_COLORS } from '../constants';
-import { getNodes as loadNodes, saveNodes as persistNodes, getConnections as loadConnections, saveConnections as persistConnections, getUsers, getSession, getMaps, getMapBySlug, saveMaps, isAbortError } from '../lib/data';
+import { getNodes as loadNodes, saveNodes as persistNodes, getConnections as loadConnections, saveConnections as persistConnections, getUsers, getSession, getMaps, saveMaps, isAbortError } from '../lib/data';
 import Map from './Map';
 import Sidebar from './Sidebar';
 import SubmissionModal from './SubmissionModal';
@@ -12,6 +12,11 @@ import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 
 interface MapExperienceProps {
+  /**
+   * Map data from page (fetched once). When provided, MapExperience uses it for
+   * display settings and role resolution instead of calling getMapBySlug again.
+   */
+  map?: SceneMap | null;
   /**
    * Map slug for loading/saving nodes via the data layer.
    * Used for both node storage and role resolution (e.g. torontopia, or custom map slug).
@@ -53,6 +58,7 @@ interface MapExperienceProps {
  * from a higher-level app shell or router.
  */
 const MapExperience: React.FC<MapExperienceProps> = ({
+  map,
   mapSlug,
   storageKey = 'torontopia_nodes',
   mapTitle = 'Torontopia',
@@ -111,25 +117,21 @@ const MapExperience: React.FC<MapExperienceProps> = ({
     img.src = mapBackgroundImageUrl;
   }, [mapBackgroundImageUrl]);
 
-  // Load map display settings (node size / font scale / enabled types) so all viewers see the same
+  // Derive display settings from passed map (page fetches once; no duplicate getMapBySlug)
   useEffect(() => {
-    const ac = new AbortController();
-    getMapBySlug(effectiveSlug, { signal: ac.signal }).then((map) => {
-      if (map) {
-        setNodeSizeScale(map.nodeSizeScale ?? 1);
-        setNodeLabelFontScale(map.nodeLabelFontScale ?? 1);
-        setRegionFontScale(map.regionFontScale ?? 1);
-        const enabled =
-          map.enabledNodeTypes && map.enabledNodeTypes.length > 0
-            ? map.enabledNodeTypes
-            : Object.values(NodeType);
-        setEnabledNodeTypes(enabled);
-        setConnectionsEnabled(map.connectionsEnabled !== false);
-        setActiveFilters((prev) => prev.filter((t) => enabled.includes(t)));
-      }
-    }).catch((err) => { if (!isAbortError(err)) { /* ignore abort on unmount */ } });
-    return () => ac.abort();
-  }, [effectiveSlug]);
+    if (map) {
+      setNodeSizeScale(map.nodeSizeScale ?? 1);
+      setNodeLabelFontScale(map.nodeLabelFontScale ?? 1);
+      setRegionFontScale(map.regionFontScale ?? 1);
+      const enabled =
+        map.enabledNodeTypes && map.enabledNodeTypes.length > 0
+          ? map.enabledNodeTypes
+          : Object.values(NodeType);
+      setEnabledNodeTypes(enabled);
+      setConnectionsEnabled(map.connectionsEnabled !== false);
+      setActiveFilters((prev) => prev.filter((t) => enabled.includes(t)));
+    }
+  }, [map]);
 
   // Load nodes from data layer (abort on unmount so we don't overwrite state after navigation)
   useEffect(() => {
@@ -155,21 +157,21 @@ const MapExperience: React.FC<MapExperienceProps> = ({
     return () => ac.abort();
   }, [effectiveSlug]);
 
-  // Hydrate user role from data layer (abort on unmount)
+  // Hydrate user role from users + session; use passed map for adminIds/collaboratorIds (no duplicate getMapBySlug)
   useEffect(() => {
     const ac = new AbortController();
     const opts = { signal: ac.signal };
-    Promise.all([getUsers(), getSession(), getMapBySlug(effectiveSlug, opts)])
-      .then(([users, session, sceneMap]) => {
+    Promise.all([getUsers(), getSession()])
+      .then(([users, session]) => {
         if (ac.signal.aborted || !session) return;
         const currentUser = users.find((u) => u.id === session.userId);
         if (!currentUser) return;
 
         let role: UserSession['role'] = 'public';
-        if (sceneMap) {
-          setHasCollaboratorPassword(!!sceneMap.collaboratorPassword);
-          if (sceneMap.adminIds.includes(currentUser.id)) role = 'admin';
-          else if (sceneMap.collaboratorIds.includes(currentUser.id)) role = 'collaborator';
+        if (map) {
+          setHasCollaboratorPassword(!!map.collaboratorPassword);
+          if (map.adminIds.includes(currentUser.id)) role = 'admin';
+          else if (map.collaboratorIds.includes(currentUser.id)) role = 'collaborator';
         }
 
         setUserSession({
@@ -181,7 +183,7 @@ const MapExperience: React.FC<MapExperienceProps> = ({
       })
       .catch((err) => { if (!isAbortError(err)) { /* ignore */ } });
     return () => ac.abort();
-  }, [effectiveSlug]);
+  }, [effectiveSlug, map]);
 
   const saveNodes = useCallback(
     (newNodes: MapNode[]) => {

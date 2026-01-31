@@ -89,6 +89,7 @@ export default function MapPage({ params }: { params: Promise<{ slug: string }> 
 
   return (
     <MapExperience
+      map={map}
       mapSlug={slug}
       mapTitle={title}
       mapSubtitle={subtitle}
