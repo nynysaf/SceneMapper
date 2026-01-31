@@ -18,7 +18,7 @@ SceneMapper is an interactive, crowd-sourced map application for building "scene
 - **Landing:** Featured maps section, logo image + fallback, "Why scene mapping?" link; copy updated (Map your scene your way, etc.).
 
 ## Component Architecture
-- `App.tsx`: Central state hub and orchestration.
+- **Next.js App Router** (`app/`): Landing (`/`), map page (`/maps/[slug]`), dashboard (`/dashboard`). Map page fetches data once and passes to MapExperience. See `docs/DATA_FLOW.md`.
 - `Map.tsx`: D3-powered SVG canvas with zoom, drag, and coordinate selection.
 - `Sidebar.tsx`: Dual-purpose UI for filtering the manifest and viewing deep-dive details.
 - `AdminReviewModal.tsx`: A focused moderation interface for verifying community submissions.

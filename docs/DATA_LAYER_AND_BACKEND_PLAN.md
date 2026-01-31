@@ -60,14 +60,14 @@ Replace every direct `localStorage` read/write with the new API:
 | **`components/MapExperience.tsx`** | Use `getNodes(mapSlug)`, `saveNodes(mapSlug, nodes)`; use `getUsers()`, `getSession()`, `getMaps()` for role hydration; use `getMapBySlug` + `saveMaps` when updating map (e.g. on approve). Pass `mapSlug` instead of `storageKey` where possible. |
 | **`app/dashboard/page.tsx`** | Use `getUsers()`, `getSession()`, `saveUsers()`, `saveSession()`, `clearSession()` for auth; remove local `getUsers` and key constants. |
 | **`app/maps/[slug]/page.tsx`** | Use `getMapBySlug(slug)` instead of reading `sceneMapper_maps`; pass `mapSlug` (e.g. `slug`) to `MapExperience` so it can call `getNodes(slug)` / `saveNodes(slug, nodes)`. |
-| **`App.tsx`** | If it still touches auth/storage, switch to `getSession()`, `getUsers()`, etc. (or remove duplication if dashboard/page owns auth). |
+| **~~App.tsx~~** | Removed (legacy Vite SPA). Next.js App Router owns routing and data flow. |
 
 After this phase, the app should behave exactly as before, but all persistence goes through `lib/data.ts`.
 
 ### 1.4 Checklist (Phase 1)
 
 - [x] `lib/data.ts` exists with all functions above, implemented via localStorage.
-- [x] No `localStorage` or `sessionStorage` in `components/`, `app/`, or root `App.tsx`.
+- [x] No `localStorage` or `sessionStorage` in `components/` or `app/`.
 - [x] Dashboard: load/save maps via data layer.
 - [x] Map page: load map by slug via data layer; MapExperience loads/saves nodes by slug.
 - [x] Auth (signup/login/logout) uses data layer only.

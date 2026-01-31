@@ -44,7 +44,6 @@
     "**/*.tsx"
   ],
   "exclude": [
-    "node_modules",
-    "vite.config.ts"
+    "node_modules"
   ]
 }
