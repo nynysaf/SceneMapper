@@ -8,7 +8,8 @@ import {
   DEFAULT_COLLABORATOR_SUBJECT,
   DEFAULT_COLLABORATOR_BODY,
 } from '../lib/invitation-email';
-import { Trash2, Link2, QrCode, Pencil, X, Plus } from 'lucide-react';
+import { parseXlsxFile, generateTemplateXlsx, type ImportResult } from '../lib/import-data';
+import { Trash2, Link2, QrCode, Pencil, X, Plus, Upload, Download, Image } from 'lucide-react';
 
 interface DashboardProps {
   onNavigate: (path: string) => void;
@@ -173,6 +174,9 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [customRegionColor, setCustomRegionColor] = useState<string>(
     DEFAULT_THEME.theme.categoryColors?.[NodeType.REGION] || '#4a5568',
   );
+  const [customMapBackgroundColor, setCustomMapBackgroundColor] = useState<string>(
+    DEFAULT_THEME.theme.backgroundColor || '#fdfcf0',
+  );
   const [customRegionFont, setCustomRegionFont] = useState<string>(
     DEFAULT_THEME.theme.regionFont || '',
   );
@@ -199,6 +203,13 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [invitationEmailSubjectCollaborator, setInvitationEmailSubjectCollaborator] = useState('');
   const [invitationEmailBodyCollaborator, setInvitationEmailBodyCollaborator] = useState('');
   const [invitationSenderName, setInvitationSenderName] = useState('');
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadResult, setUploadResult] = useState<ImportResult | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [mapIcon, setMapIcon] = useState<string>('🗺️');
+  const [mapIconBackground, setMapIconBackground] = useState<string>('#059669');
+  const [showIconPicker, setShowIconPicker] = useState(false);
 
   const copyMapLink = (map: SceneMap) => {
     if (typeof window === 'undefined') return;
@@ -228,6 +239,9 @@ const Dashboard: React.FC<DashboardProps> = ({
       setInvitationEmailSubjectCollaborator('');
       setInvitationEmailBodyCollaborator('');
       setInvitationSenderName('');
+      setMapIcon('🗺️');
+      setMapIconBackground('#059669');
+      setCustomMapBackgroundColor(DEFAULT_THEME.theme.backgroundColor ?? '#fdfcf0');
       setBackgroundFile(null);
     }
     setMapToDelete(null);
@@ -280,6 +294,8 @@ const Dashboard: React.FC<DashboardProps> = ({
     setInvitationEmailSubjectCollaborator(match.invitationEmailSubjectCollaborator ?? '');
     setInvitationEmailBodyCollaborator(match.invitationEmailBodyCollaborator ?? '');
     setInvitationSenderName(match.invitationSenderName ?? '');
+    setMapIcon(match.icon ?? '🗺️');
+    setMapIconBackground(match.iconBackground ?? '#059669');
     setBackgroundFile(null);
     setBackgroundError(null);
     setMapError(null);
@@ -293,6 +309,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       setCustomCommunityColor(themeToUse.categoryColors[NodeType.COMMUNITY] || customCommunityColor);
       setCustomRegionColor(themeToUse.categoryColors[NodeType.REGION] || customRegionColor);
     }
+    setCustomMapBackgroundColor(themeToUse.backgroundColor ?? '#fdfcf0');
     setCustomRegionFont(themeToUse.regionFont ?? '');
     if (themeToUse.connectionLine) {
       setCustomConnectionLineColor(themeToUse.connectionLine.color);
@@ -401,6 +418,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
     const selectedTheme: MapTheme = {
       ...selectedPreset.theme,
+      backgroundColor: customMapBackgroundColor,
       categoryColors: {
         [NodeType.EVENT]: customEventColor,
         [NodeType.PERSON]: customPersonColor,
@@ -439,6 +457,8 @@ const Dashboard: React.FC<DashboardProps> = ({
       invitationSenderName: invitationSenderName.trim() || undefined,
       enabledNodeTypes: enabledNodeTypes.length < 4 ? enabledNodeTypes : undefined,
       connectionsEnabled: connectionsEnabled ? undefined : false,
+      icon: mapIcon || undefined,
+      iconBackground: mapIconBackground || undefined,
     };
 
     if (backgroundImageUrl !== undefined) {
@@ -520,6 +540,9 @@ const Dashboard: React.FC<DashboardProps> = ({
     setInvitationEmailSubjectCollaborator('');
     setInvitationEmailBodyCollaborator('');
     setInvitationSenderName('');
+    setMapIcon('🗺️');
+    setMapIconBackground('#059669');
+    setCustomMapBackgroundColor(DEFAULT_THEME.theme.backgroundColor ?? '#fdfcf0');
     setBackgroundFile(null);
     setEditingMapId(null);
     setEditingOriginalSlug(null);
@@ -579,6 +602,11 @@ const Dashboard: React.FC<DashboardProps> = ({
           <h2 className="text-2xl md:text-3xl font-bold text-emerald-950">
             {editingMapId ? 'Edit your map' : 'Map your scene, your way.'}
           </h2>
+          {editingMapId && (
+            <p className="text-sm text-emerald-800 leading-relaxed">
+              Evolution is sexy. Now is a great time to tweak your description, refresh your colours, and add some new collaborators! 😎
+            </p>
+          )}
           {!editingMapId && (
             <div className="text-sm text-emerald-800 leading-relaxed">
               <p>
@@ -616,13 +644,28 @@ const Dashboard: React.FC<DashboardProps> = ({
                       <label className="text-sm font-semibold text-emerald-900">
                         Title
                       </label>
-                      <input
-                        type="text"
-                        className="w-full bg-white/70 border border-emerald-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-400"
-                        placeholder="Torontopia: Solarpunk Commons"
-                        value={mapTitle}
-                        onChange={(e) => setMapTitle(e.target.value)}
-                      />
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowIconPicker(true)}
+                          className="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0 hover:opacity-80 transition-opacity overflow-hidden"
+                          style={{ backgroundColor: mapIconBackground }}
+                          title="Click to change icon"
+                        >
+                          {(mapIcon.startsWith('data:') || mapIcon.startsWith('http')) ? (
+                            <img src={mapIcon} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            mapIcon
+                          )}
+                        </button>
+                        <input
+                          type="text"
+                          className="flex-1 bg-white/70 border border-emerald-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-400"
+                          placeholder="Torontopia: Solarpunk Commons"
+                          value={mapTitle}
+                          onChange={(e) => setMapTitle(e.target.value)}
+                        />
+                      </div>
                     </div>
                     <div className="space-y-1">
                       <label className="text-sm font-semibold text-emerald-900">
@@ -660,7 +703,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         {mapDescription.length}/1200
                       </p>
                     </div>
-                    <div className="space-y-1">
+                    <div className="space-y-1 pb-4">
                       <label className="text-sm font-semibold text-emerald-900">
                         Background map image
                       </label>
@@ -684,6 +727,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         </p>
                       )}
                     </div>
+                    <hr className="border-emerald-100 my-4" />
                     <div className="space-y-1">
                       <label className="text-sm font-semibold text-emerald-900">
                         Theme
@@ -706,6 +750,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                             );
                             setCustomRegionColor(cat[NodeType.REGION] || customRegionColor);
                           }
+                          setCustomMapBackgroundColor(preset.theme.backgroundColor ?? '#fdfcf0');
                           setCustomRegionFont(preset.theme.regionFont ?? '');
                           const conn = preset.theme.connectionLine;
                           if (conn) {
@@ -730,7 +775,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                       <div className="mt-2 grid grid-cols-2 gap-3 pb-4">
                         <div className="space-y-1">
                           <label className="text-xs font-semibold text-emerald-900">
-                            Event color
+                            Event colour
                           </label>
                           <input
                             type="color"
@@ -746,7 +791,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         </div>
                         <div className="space-y-1">
                           <label className="text-xs font-semibold text-emerald-900">
-                            Person color
+                            Person colour
                           </label>
                           <input
                             type="color"
@@ -762,7 +807,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         </div>
                         <div className="space-y-1">
                           <label className="text-xs font-semibold text-emerald-900">
-                            Space color
+                            Space colour
                           </label>
                           <input
                             type="color"
@@ -777,8 +822,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                           />
                         </div>
                         <div className="space-y-1">
-                          <label className="text-[10px] font-semibold text-emerald-900">
-                            Community color
+                          <label className="text-xs font-semibold text-emerald-900">
+                            Community colour
                           </label>
                           <input
                             type="color"
@@ -808,8 +853,27 @@ const Dashboard: React.FC<DashboardProps> = ({
                             }}
                           />
                         </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-emerald-900">
+                            Background colour
+                          </label>
+                          <input
+                            type="color"
+                            className="h-8 w-full rounded-md border border-emerald-100 bg-white/70"
+                            value={customMapBackgroundColor}
+                            onChange={(e) => {
+                              setCustomMapBackgroundColor(e.target.value);
+                              if (selectedThemeId === baseThemeId) {
+                                setSelectedThemeId('custom');
+                              }
+                            }}
+                          />
+                          <p className="text-[10px] text-emerald-700">
+                            Colour behind the map image
+                          </p>
+                        </div>
                         <div className="space-y-1 col-span-2">
-                          <label className="text-[10px] font-semibold text-emerald-900">
+                          <label className="text-xs font-semibold text-emerald-900">
                             Region font
                           </label>
                           <select
@@ -822,12 +886,12 @@ const Dashboard: React.FC<DashboardProps> = ({
                               }
                             }}
                           >
-                            <option value="">Default (Georgia, serif)</option>
-                            <option value="Georgia, serif">Georgia</option>
-                            <option value="'Playfair Display', serif">Playfair Display</option>
-                            <option value="'Outfit', sans-serif">Outfit</option>
-                            <option value="'Inter', sans-serif">Inter</option>
-                            <option value="system-ui, sans-serif">System UI</option>
+                            <option value="" style={{ fontFamily: 'Georgia, serif' }}>Default (Georgia, serif)</option>
+                            <option value="Georgia, serif" style={{ fontFamily: 'Georgia, serif' }}>Georgia</option>
+                            <option value="'Playfair Display', serif" style={{ fontFamily: "'Playfair Display', serif" }}>Playfair Display</option>
+                            <option value="'Outfit', sans-serif" style={{ fontFamily: "'Outfit', sans-serif" }}>Outfit</option>
+                            <option value="'Inter', sans-serif" style={{ fontFamily: "'Inter', sans-serif" }}>Inter</option>
+                            <option value="system-ui, sans-serif" style={{ fontFamily: 'system-ui, sans-serif' }}>System UI</option>
                           </select>
                         </div>
                       </div>
@@ -835,9 +899,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                         <label className="text-xs font-semibold text-emerald-900 block">
                           Connection lines
                         </label>
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-3 gap-3">
                           <div className="space-y-1">
-                            <label className="text-[10px] font-semibold text-emerald-900">
+                            <label className="text-xs font-semibold text-emerald-900">
                               Line colour
                             </label>
                             <input
@@ -870,15 +934,15 @@ const Dashboard: React.FC<DashboardProps> = ({
                               {Math.round(customConnectionLineOpacity * 100)}%
                             </span>
                           </div>
-                          <div className="space-y-1 col-span-2">
+                          <div className="space-y-1">
                             <label className="text-xs font-semibold text-emerald-900">
-                              Thickness (px)
+                              Thickness
                             </label>
                             <input
                               type="number"
                               min={1}
                               max={6}
-                              className="w-full bg-white/70 border border-emerald-100 rounded-xl px-3 py-2 text-sm"
+                              className="w-full h-8 bg-white/70 border border-emerald-100 rounded-md px-2 text-sm"
                               value={customConnectionLineThickness}
                               onChange={(e) => {
                                 const v = Number(e.target.value);
@@ -987,6 +1051,126 @@ const Dashboard: React.FC<DashboardProps> = ({
                         </button>
                       </p>
                     </div>
+                    {editingMapId && (
+                      <>
+                        <div className="pt-3 border-t border-emerald-100">
+                        <div className="space-y-2 pt-2 pb-6">
+                          <label className="text-sm font-semibold text-emerald-900">
+                            Upload data
+                          <span className="ml-1 text-xs font-normal text-emerald-700">
+                            (optional)
+                          </span>
+                        </label>
+                        <p className="text-xs text-emerald-700">
+                          Upload an xlsx file to bulk import nodes and connections. Duplicates (matching title + type) are skipped.
+                        </p>
+                        <div className="flex items-center gap-3">
+                          <label className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed border-emerald-200 text-emerald-700 font-semibold text-sm hover:bg-emerald-50 hover:border-emerald-300 transition-colors cursor-pointer">
+                            <Upload className="w-4 h-4" />
+                            {uploadFile ? uploadFile.name : 'Choose xlsx file'}
+                            <input
+                              type="file"
+                              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0] || null;
+                                setUploadFile(file);
+                                setUploadResult(null);
+                                setUploadError(null);
+                              }}
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                const blob = await generateTemplateXlsx();
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = 'SceneMapper_Template.xlsx';
+                                a.click();
+                                URL.revokeObjectURL(url);
+                              } catch {
+                                setUploadError('Could not generate template');
+                              }
+                            }}
+                            className="flex items-center gap-1 px-3 py-2.5 rounded-xl text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors"
+                          >
+                            <Download className="w-4 h-4" />
+                            Template
+                          </button>
+                        </div>
+                        {uploadFile && !uploadResult && (
+                          <button
+                            type="button"
+                            disabled={isUploading}
+                            onClick={async () => {
+                              if (!uploadFile || !editingOriginalSlug) return;
+                              setIsUploading(true);
+                              setUploadError(null);
+                              try {
+                                const { getNodes, getConnections, saveNodes, saveConnections } = await import('../lib/data');
+                                const existingNodes = await getNodes(editingOriginalSlug);
+                                const existingConnections = await getConnections(editingOriginalSlug);
+                                const result = await parseXlsxFile(uploadFile, existingNodes, existingConnections);
+                                
+                                if (result.nodesAdded.length > 0) {
+                                  await saveNodes(editingOriginalSlug, [...existingNodes, ...result.nodesAdded]);
+                                }
+                                if (result.connectionsAdded.length > 0) {
+                                  await saveConnections(editingOriginalSlug, [...existingConnections, ...result.connectionsAdded]);
+                                }
+                                
+                                setUploadResult(result);
+                              } catch (err) {
+                                setUploadError(err instanceof Error ? err.message : 'Upload failed');
+                              } finally {
+                                setIsUploading(false);
+                              }
+                            }}
+                            className="w-full bg-emerald-100 text-emerald-800 py-2 rounded-xl font-semibold text-sm hover:bg-emerald-200 transition-colors disabled:opacity-50"
+                          >
+                            {isUploading ? 'Processing...' : 'Process upload'}
+                          </button>
+                        )}
+                        {uploadResult && (
+                          <div className="text-xs bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2 space-y-1">
+                            <p className="font-semibold text-emerald-900">Upload complete:</p>
+                            <ul className="list-disc list-inside text-emerald-700">
+                              <li>{uploadResult.nodesAdded.length} nodes added</li>
+                              <li>{uploadResult.connectionsAdded.length} connections added</li>
+                              {uploadResult.nodesDuplicate > 0 && (
+                                <li>{uploadResult.nodesDuplicate} duplicate nodes skipped</li>
+                              )}
+                              {uploadResult.connectionsDuplicate > 0 && (
+                                <li>{uploadResult.connectionsDuplicate} duplicate connections skipped</li>
+                              )}
+                            </ul>
+                            {uploadResult.errors.length > 0 && (
+                              <div className="mt-2 text-rose-600">
+                                <p className="font-semibold">Errors:</p>
+                                <ul className="list-disc list-inside">
+                                  {uploadResult.errors.slice(0, 5).map((err, i) => (
+                                    <li key={i}>{err}</li>
+                                  ))}
+                                  {uploadResult.errors.length > 5 && (
+                                    <li>...and {uploadResult.errors.length - 5} more</li>
+                                  )}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {uploadError && (
+                          <p className="text-xs text-rose-600 bg-rose-50 border border-rose-100 rounded-xl px-3 py-2">
+                            {uploadError}
+                          </p>
+                        )}
+                        </div>
+                        </div>
+                      </>
+                    )}
 
                     {mapError && (
                       <p className="text-[11px] text-rose-600 bg-rose-50 border border-rose-100 rounded-xl px-3 py-2">
@@ -1134,7 +1318,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         {roleForMap(map)}
                       </span>
                     </div>
-                    <div className="flex items-center gap-1 shrink-0">
+                    <div className="flex items-center gap-0.5 shrink-0 ml-auto">
                       <button
                         type="button"
                         onClick={() => {
@@ -1152,6 +1336,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                           setInvitationEmailSubjectCollaborator(map.invitationEmailSubjectCollaborator ?? '');
                           setInvitationEmailBodyCollaborator(map.invitationEmailBodyCollaborator ?? '');
                           setInvitationSenderName(map.invitationSenderName ?? '');
+                          setMapIcon(map.icon ?? '🗺️');
+                          setMapIconBackground(map.iconBackground ?? '#059669');
                           setBaseThemeId(map.themeId || DEFAULT_THEME.id);
                           const preset = THEME_PRESETS.find((p) => p.id === map.themeId) ?? DEFAULT_THEME;
                           const theme = map.theme || preset.theme;
@@ -1162,6 +1348,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                             setCustomCommunityColor(theme.categoryColors[NodeType.COMMUNITY] ?? customCommunityColor);
                             setCustomRegionColor(theme.categoryColors[NodeType.REGION] ?? customRegionColor);
                           }
+                          setCustomMapBackgroundColor(theme.backgroundColor ?? '#fdfcf0');
                           setCustomRegionFont(theme.regionFont ?? '');
                           if (theme.connectionLine) {
                             setCustomConnectionLineColor(theme.connectionLine.color);
@@ -1226,6 +1413,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     setCustomCommunityColor(t.categoryColors[NodeType.COMMUNITY] ?? customCommunityColor);
                     setCustomRegionColor(t.categoryColors[NodeType.REGION] ?? customRegionColor);
                   }
+                  setCustomMapBackgroundColor(t.backgroundColor ?? '#fdfcf0');
                   setCustomRegionFont(t.regionFont ?? '');
                   if (t.connectionLine) {
                     setCustomConnectionLineColor(t.connectionLine.color);
@@ -1240,6 +1428,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                   setInvitationEmailSubjectCollaborator('');
                   setInvitationEmailBodyCollaborator('');
                   setInvitationSenderName('');
+                  setMapIcon('🗺️');
+                  setMapIconBackground('#059669');
                   setBackgroundFile(null);
                   setBackgroundError(null);
                   setMapError(null);
@@ -1438,6 +1628,115 @@ const Dashboard: React.FC<DashboardProps> = ({
             >
               Close
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Icon picker modal */}
+      {showIconPicker && (
+        <div
+          className="fixed inset-0 z-[65] flex items-center justify-center p-4 bg-emerald-950/30 backdrop-blur-sm"
+          onClick={() => setShowIconPicker(false)}
+        >
+          <div
+            className="glass w-full max-w-sm rounded-3xl solarpunk-shadow overflow-hidden flex flex-col animate-in fade-in zoom-in duration-300"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-5 border-b border-emerald-100 bg-white/60 flex justify-between items-center">
+              <h2 className="text-lg font-bold text-emerald-950">Choose icon</h2>
+              <button
+                type="button"
+                onClick={() => setShowIconPicker(false)}
+                className="p-2 rounded-full hover:bg-emerald-100 text-emerald-800"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4 bg-white/40">
+              <div className="flex justify-center">
+                <div
+                  className="w-20 h-20 rounded-2xl flex items-center justify-center text-4xl overflow-hidden"
+                  style={{ backgroundColor: mapIconBackground }}
+                >
+                  {(mapIcon.startsWith('data:') || mapIcon.startsWith('http')) ? (
+                    <img src={mapIcon} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    mapIcon
+                  )}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-emerald-900">Upload image</label>
+                <label className="flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed border-emerald-200 text-emerald-700 font-semibold text-sm hover:bg-emerald-50 hover:border-emerald-300 transition-colors cursor-pointer">
+                  <Image className="w-4 h-4" />
+                  Choose image
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/gif"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                          if (typeof reader.result === 'string') setMapIcon(reader.result);
+                        };
+                        reader.readAsDataURL(file);
+                        e.target.value = '';
+                      }
+                    }}
+                  />
+                </label>
+                <p className="text-[10px] text-emerald-700">PNG, JPG, WebP or GIF · square images work best</p>
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-emerald-900">Emoji</label>
+                <div className="grid grid-cols-8 gap-2">
+                  {['🗺️', '🌍', '🌎', '🌏', '📍', '🎯', '⭐', '💫', '🌱', '🌿', '🌳', '🏙️', '🎨', '🎭', '🎵', '🎤', '🎸', '🎹', '📚', '💡', '🔮', '🌈', '🌊', '🔥', '⚡', '🚀', '🎪', '🎠', '🏛️', '🏰', '🌸', '🍀'].map((emoji) => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={() => setMapIcon(emoji)}
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center text-lg hover:bg-emerald-100 transition-colors ${(mapIcon.startsWith('data:') || mapIcon.startsWith('http')) ? 'bg-white/50' : mapIcon === emoji ? 'bg-emerald-200 ring-2 ring-emerald-400' : 'bg-white/50'}`}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-emerald-900">Background colour</label>
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="color"
+                    className="h-10 w-20 rounded-lg border border-emerald-100 bg-white/70"
+                    value={mapIconBackground}
+                    onChange={(e) => setMapIconBackground(e.target.value)}
+                  />
+                  <div className="flex gap-1">
+                    {['#059669', '#0891b2', '#7c3aed', '#db2777', '#ea580c', '#ca8a04', '#16a34a', '#1d4ed8'].map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        onClick={() => setMapIconBackground(color)}
+                        className={`w-8 h-8 rounded-lg transition-transform hover:scale-110 ${mapIconBackground === color ? 'ring-2 ring-emerald-400 ring-offset-1' : ''}`}
+                        style={{ backgroundColor: color }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowIconPicker(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700"
+                >
+                  Done
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

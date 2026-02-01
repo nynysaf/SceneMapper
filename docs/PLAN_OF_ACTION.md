@@ -1,142 +1,101 @@
-# Scene Mapper: Plan of Action — Production Parity
+# Scene Mapper: Development Plan — Feb 1, 2026 Session
 
-**Goal:** Understand root causes of local vs production discrepancies, fix them systematically, and add guardrails so new errors are not introduced.
-
-**Principle:** Do **diagnostics first** (no deploy of fixes until we know causes). Then apply **ordered fixes**. Then **lock habits** with checklists and automation.
+**Goal:** Implement new UI/UX features for the Dashboard create/edit screens before pushing to production.
 
 ---
 
-## Part 1: Diagnostics (Do First — No Fixes Yet)
+## Current Session Tasks
 
-Run these in order. **Record results** (pass/fail and any findings) in **`docs/DIAGNOSTIC_RESULTS.md`** before changing production or code. The aim is to confirm *why* production behaves differently, not to guess.
+### 1. Featured Map
+- [x] **1.1** Add `emerging-scene-toronto` to `FEATURED_MAP_HREFS` in `LandingPage.tsx`
 
-### D1. Local build
+### 2. UI Spacing & Dividers (Dashboard Create/Edit)
+- [x] **2.1** Add a divider line between Background map image and Theme sections
+- [x] **2.2** Add body text under "Edit your map" title: "Evolution is sexy. Now is a great time to tweak your description, refresh your colours, and add some new collaborators! 😎"
 
-- [ ] Run: `npm run build`
-- [ ] **Result:** ________________ (exit code 0 = pass; non-zero = fail; note any errors)
-- **Why:** If the build fails locally, Vercel will fail or produce a broken bundle. CI already runs this on push; we need a green build before any other fix.
+### 3. Connection Lines Layout
+- [x] **3.1** Put Line Colour, Opacity, and Thickness on the same row by shrinking Line Colour column width (use 3-column grid)
 
-### D2. Vercel environment audit (manual)
+### 4. Font Size Consistency
+- [x] **4.1** Update "Region font" label to use `text-xs` (matches Event colour)
+- [x] **4.2** Update "Community color" label to use `text-xs` (matches Event colour)  
+- [x] **4.3** Update "Line colour" label to use `text-xs` (matches Event colour)
 
-In **Vercel → Project → Settings → Environment Variables**:
+### 5. Canadian Spelling (Colour)
+- [x] **5.1** Change all "Color" labels to "Colour" in Dashboard.tsx
+- [x] **5.2** Audit other components for "Color" references that users see
 
-- [ ] **Production** environment is selected (or note which env runs the production build).
-- [ ] `NEXT_PUBLIC_USE_BACKEND` exists and value is exactly `true` for **Production**. (If missing or false, production client uses localStorage — root cause of “maps don’t appear,” “Edit → Create.”)
-- [ ] `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are set for Production and match the Supabase project where you run migrations.
-- [ ] Optional: `RESEND_API_KEY`, `RESEND_FROM_EMAIL` if you use invitations.
-- [ ] **Note:** `NEXT_PUBLIC_*` is inlined at **build time**. After any env change, a **new deploy** is required.
+### 6. Region Font Dropdown Preview
+- [x] **6.1** Display each font option in its own font-family in the Region font dropdown
 
-**Record:** List any variable missing or wrong: ________________
+### 7. Upload Data Feature (New)
+- [x] **7.1** Add "Upload data (optional)" field below "Edit invitation email" link
+- [x] **7.2** Create xlsx file input with drag-and-drop support
+- [x] **7.3** Add "Download template" link for blank xlsx with correct headers
+- [x] **7.4** Implement duplicate detection logic (check existing database)
+- [x] **7.5** Add new unique rows from uploaded file to database
+- [x] **7.6** Show upload results (added count, duplicates skipped)
 
-### D3. Production network and behavior
-
-On the **live production URL** (Vercel):
-
-- [ ] Open DevTools → Network. Reload Dashboard. Is there a request to `/api/maps`?
-  - **If no:** Client is likely using localStorage (`USE_BACKEND` false in build). Confirms D2.
-  - **If yes:** Note status (200 / 4xx / 5xx) and response body (array of maps vs `{ error: "..." }`).
-- [ ] Open a map page (e.g. `/maps/<slug>`). Is there a request to `/api/maps/<slug>` and `/api/maps/<slug>/nodes`? Status and body?
-- [ ] Check Vercel **Function Logs** (or Deployment logs) for GET/POST `/api/maps` and `/api/maps/[slug]`: any 500s or error messages?
-
-**Record:** API called? Status? Log errors? ________________
-
-### D4. Supabase schema vs migrations
-
-In the Supabase project that **Production** uses (same as `SUPABASE_URL`):
-
-- [ ] **Table Editor:** Confirm tables `users`, `maps`, `nodes`, `connections` exist.
-- [ ] **maps table:** Confirm columns exist:
-  - Core: `id`, `slug`, `title`, `theme`, `created_at`, etc.
-  - From migrations: `invitation_email_subject_admin`, `invitation_email_body_admin`, … (invitation_emails); `region_font_scale`, `enabled_node_types`, `connections_enabled` (maps_display_options).
-- [ ] Compare with migration files in `supabase/migrations/`. Any migration **not** run in this project?
-
-**Record:** All migrations applied? Any missing columns? ________________
-
-### D5. Production-like local run (optional but strong)
-
-- [ ] In `.env.local`: `NEXT_PUBLIC_USE_BACKEND=true` and same `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` as production.
-- [ ] Run: `npm run build && npm run start`
-- [ ] In browser: sign in → Dashboard → create a map → save → does it appear in the list?
-- [ ] Click Edit (pencil): does form show “Edit” with all fields (theme, options, invitation email) populated?
-- [ ] Open the map: do theme and options match what you saved?
-
-**Record:** Parity pass? Failures? ________________
+### 8. Map Icon Customization (New)
+- [x] **8.1** Add clickable icon beside map name in edit mode
+- [x] **8.2** Create emoji picker popup modal
+- [x] **8.3** Add background colour picker for icon
+- [x] **8.4** Save icon emoji and background colour to map data
+- [x] **8.5** Display custom icon in map list and map view
 
 ---
 
-## Part 2: Fixes (After Diagnostics)
+## Backlog (Previous Plan - Deferred)
 
-Apply in this order. Each step depends on the previous.
+### Diagnostics (Production Parity)
+- [ ] D1. Local build: Run `npm run build`
+- [ ] D2. Vercel environment audit (manual)
+- [ ] D3. Production network and behavior
+- [ ] D4. Supabase schema vs migrations
+- [ ] D5. Production-like local run
 
-### F1. Environment (Vercel)
+### Fixes (After Diagnostics)
+- [ ] F1. Environment (Vercel)
+- [ ] F2. Supabase schema
+- [ ] F3. API and mappers
+- [ ] F4. Error surfacing (no silent failures)
+- [ ] F5. Env naming consistency
 
-- Set **Production** env vars per `docs/ENV_AND_MIGRATIONS_CHECKLIST.md`:  
-  `NEXT_PUBLIC_USE_BACKEND=true`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (and Resend if used).
-- **Redeploy** after changing env (required for `NEXT_PUBLIC_*` and for runtime vars).
+### Guardrails (Prevent Regressions)
+- [ ] G1. Pre-push / pre-deploy checklist
+- [ ] G2. CI (already in place)
+- [ ] G3. Post-deploy smoke test
+- [ ] G4. Single source of truth for "what to check"
 
-### F2. Supabase schema
-
-- Run any **missing** migrations (in order) on the project that Production uses (SQL Editor or `supabase db push`).
-- Confirm `maps` has all columns the app expects (see D4 and `lib/db-mappers.ts`).
-
-### F3. API and mappers
-
-- Ensure `lib/db-mappers.ts`: `DbMap` and `dbMapToSceneMap` / `sceneMapToDbMap` include every field the UI uses (theme, regionFontScale, enabledNodeTypes, connectionsEnabled, invitation email fields).
-- Ensure GET `/api/maps` and GET `/api/maps/[slug]` return that full shape (no dropped columns).
-
-### F4. Error surfacing (no silent failures)
-
-- Where the client catches API errors (e.g. `getMaps().catch(() => setMaps([]))`), show a clear message (e.g. “Could not load maps”) so “API failed” is distinguishable from “no data.”
-- Map page: when `getMapBySlug` returns null / 404, show “Map not found” and a link to Dashboard instead of a blank or default-themed page.
-
-### F5. Env naming consistency (optional)
-
-- Code uses `NEXT_PUBLIC_APP_ORIGIN` in `lib/invitation-email.ts`; docs mention `NEXT_PUBLIC_APP_URL`. Align naming in `.env.example` and deployment docs (use one name and document it).
+### Future Enhancements
+- [ ] Tier 3 (remaining): Short TTL cache, prefetch from Dashboard
+- [ ] Remove debug logging from `POST /api/maps` once stable
+- [ ] Supabase Auth / NextAuth to replace role simulation
 
 ---
 
-## Part 3: Guardrails (Prevent Regressions)
+## Session Progress
 
-### G1. Pre-push / pre-deploy checklist
-
-Before every push that can affect production:
-
-1. **Build:** `npm run build` — must pass (exit code 0).
-2. **Data layer:** If you changed `lib/data.ts` (signatures/exports), grep for `getMaps(`, `getMapBySlug(`, `getNodes(`, `getConnections(` and verify every call site.
-3. **Env:** If you added env vars, update `.env.example` and `docs/ENV_AND_MIGRATIONS_CHECKLIST.md`; ensure Vercel Production has them.
-4. **Migrations:** Any new migration in `supabase/migrations/` must be run on the Supabase project used by the deployment target.
-
-**Habit:** Do not push to the deploy branch (e.g. `main`) without a green build.
-
-### G2. CI (already in place)
-
-- `.github/workflows/build.yml` runs `npm run build` on push/PR to `main`. Keeps broken builds from reaching Vercel.
-- **Optional:** Run build with `NEXT_PUBLIC_USE_BACKEND=true` in CI so the built bundle matches production (catches build-time env issues).
-
-### G3. Post-deploy smoke test
-
-After each production deploy:
-
-- [ ] Open production URL → sign in → Dashboard: map list loads (or empty with no errors).
-- [ ] Create a map → save → it appears in the list.
-- [ ] Click Edit (pencil): form shows “Edit” with correct fields.
-- [ ] Open the map: theme and options match.
-- [ ] Open `/maps/nonexistent-slug`: “Map not found” (or clear error), not blank.
-
-### G4. Single source of truth for “what to check”
-
-- **Pre-deploy:** `docs/ENV_AND_MIGRATIONS_CHECKLIST.md` + “Pre-push checklist” above.
-- **Post-deploy:** “Post-deploy smoke test” above.
-- **Full playbook:** `docs/ZERO_DISCREPANCY_STRATEGY.md` (phases 1–5).
+| Task | Status | Notes |
+|------|--------|-------|
+| 1.1 Featured map | ✅ Complete | Added `emerging-scene-toronto` to FEATURED_MAP_HREFS |
+| 2.1 Divider line | ✅ Complete | Added `<hr>` between Background image and Theme sections |
+| 2.2 Edit body text | ✅ Complete | Added encouraging text with emoji under Edit title |
+| 3.1 Connection lines row | ✅ Complete | Changed to 3-column grid, all fields on one row |
+| 4.1-4.3 Font sizes | ✅ Complete | All labels now use `text-xs` consistently |
+| 5.1-5.2 Canadian spelling | ✅ Complete | Changed all "Color" to "Colour" |
+| 6.1 Font preview dropdown | ✅ Complete | Added `style` with font-family to each option |
+| 7.1-7.6 Upload data | ✅ Complete | Added xlsx upload with duplicate detection + template download |
+| 8.1-8.5 Icon customization | ✅ Complete | Added emoji picker with background colour selection |
 
 ---
 
-## Summary: Order of Work
+## Key Files
 
-| Phase   | What to do |
-|---------|------------|
-| **Diagnostics** | D1 (local build) → D2 (Vercel env) → D3 (production network/logs) → D4 (Supabase schema) → D5 (production-like local). Record results. |
-| **Fixes**       | F1 (env + redeploy) → F2 (migrations) → F3 (mappers/API) → F4 (error surfacing) → F5 (env naming if desired). |
-| **Guardrails**  | G1 (pre-push checklist), G2 (CI), G3 (smoke test), G4 (doc pointers). |
-
-**Start at the beginning:** Run **D1** (local build) and record the result. Then proceed through D2–D5 before applying F1–F5.
+| File | Relevant Tasks |
+|------|----------------|
+| `components/LandingPage.tsx` | 1.1 (FEATURED_MAP_HREFS) |
+| `components/Dashboard.tsx` | 2.1, 2.2, 3.1, 4.x, 5.x, 6.1, 7.x, 8.x |
+| `types.ts` | 8.4 (add icon fields to SceneMap) |
+| `lib/data.ts` | 7.x (upload/duplicate logic) |
+| `lib/db-mappers.ts` | 7.x, 8.x (new fields) |

@@ -138,6 +138,14 @@ export interface SceneMap {
    * Whether connections are shown and available. Default true when absent.
    */
   connectionsEnabled?: boolean;
+  /**
+   * Custom emoji icon for the map. Displayed in map list and header.
+   */
+  icon?: string;
+  /**
+   * Background colour for the custom icon.
+   */
+  iconBackground?: string;
 }
 
 /**

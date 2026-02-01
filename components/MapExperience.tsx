@@ -523,26 +523,28 @@ const MapExperience: React.FC<MapExperienceProps> = ({
       const dateForFilename = now.toISOString().slice(0, 10); // YYYY-MM-DD
       const safeTitle = (mapTitle || 'Map').replace(/[\s\\/:*?"<>|]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || 'map';
 
+      const exportScale = 2;
       html2canvas(el, {
-        scale: 1,
+        scale: exportScale,
         useCORS: true,
         allowTaint: true,
-        backgroundColor: '#fdfcf0',
+        backgroundColor: mapTheme?.backgroundColor ?? '#fdfcf0',
         logging: false,
       })
         .then((canvas) => {
           const ctx = canvas.getContext('2d');
           if (ctx) {
+            const scale = canvas.width / el.offsetWidth;
             const title = mapTitle || 'Map';
-            const padding = 24;
+            const padding = 24 * scale;
             const titleX = canvas.width - padding;
-            const titleY = 36;
-            const dateY = 56;
+            const titleY = 36 * scale;
+            const dateY = 56 * scale;
             ctx.textAlign = 'right';
             ctx.fillStyle = 'rgba(0,0,0,0.75)';
-            ctx.font = 'bold 22px system-ui, sans-serif';
+            ctx.font = `bold ${22 * scale}px system-ui, sans-serif`;
             ctx.fillText(title, titleX, titleY);
-            ctx.font = '12px system-ui, sans-serif';
+            ctx.font = `${12 * scale}px system-ui, sans-serif`;
             ctx.fillText(dateStr, titleX, dateY);
           }
 
@@ -551,8 +553,10 @@ const MapExperience: React.FC<MapExperienceProps> = ({
 
           if (exportFormat === 'pdf') {
             const imgData = canvas.toDataURL('image/png');
-            const pdf = new jsPDF('p', 'px', [canvas.width, canvas.height]);
-            pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+            const pdfW = el.offsetWidth;
+            const pdfH = el.offsetHeight;
+            const pdf = new jsPDF('p', 'px', [pdfW, pdfH]);
+            pdf.addImage(imgData, 'PNG', 0, 0, pdfW, pdfH, undefined, 'FAST');
             pdf.save(filename);
           } else {
             canvas.toBlob(
@@ -579,7 +583,7 @@ const MapExperience: React.FC<MapExperienceProps> = ({
 
     const t = setTimeout(runCapture, 350);
     return () => clearTimeout(t);
-  }, [isExporting, exportFormat, mapTitle]);
+  }, [isExporting, exportFormat, mapTitle, mapTheme]);
 
   const handleJoinCollaborator = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -678,10 +682,16 @@ const MapExperience: React.FC<MapExperienceProps> = ({
         <div className="pointer-events-auto flex items-center gap-4">
           <div className="glass p-3 rounded-2xl solarpunk-shadow flex items-center gap-3">
             <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-sm shrink-0"
-              style={{ backgroundColor: mapTheme?.primaryColor ?? '#059669' }}
+              className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-sm shrink-0 overflow-hidden"
+              style={{ backgroundColor: map?.iconBackground ?? mapTheme?.primaryColor ?? '#059669' }}
             >
-              {mapTitle.split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase().slice(0, 2) || '?'}
+              {map?.icon && (map.icon.startsWith('data:') || map.icon.startsWith('http')) ? (
+                <img src={map.icon} alt="" className="w-full h-full object-cover" />
+              ) : map?.icon ? (
+                <span className="text-lg">{map.icon}</span>
+              ) : (
+                mapTitle.split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase().slice(0, 2) || '?'
+              )}
             </div>
             <div>
               <h1 className="text-xl font-bold text-emerald-900 leading-tight">{mapTitle}</h1>
@@ -855,6 +865,7 @@ const MapExperience: React.FC<MapExperienceProps> = ({
                 ? { color: mapTheme.primaryColor, opacity: 0.6, thickness: 2 }
                 : undefined)
             }
+            mapBackgroundColor={mapTheme?.backgroundColor}
             exportMode
           />
         </div>
@@ -890,6 +901,7 @@ const MapExperience: React.FC<MapExperienceProps> = ({
           currentUserName={userSession.name}
           onConnectionCurveChange={userSession.role !== 'public' ? handleConnectionCurveChange : undefined}
           connectionLineStyle={mapTheme?.connectionLine ?? (mapTheme ? { color: mapTheme.primaryColor, opacity: 0.6, thickness: 2 } : undefined)}
+          mapBackgroundColor={mapTheme?.backgroundColor}
         />
 
         {/* Floating Popup for Node Details */}

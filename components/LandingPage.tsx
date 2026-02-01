@@ -8,6 +8,7 @@ import type { User, SceneMap } from '../types';
  */
 export const FEATURED_MAP_HREFS: string[] = [
   '/maps/torontopia',
+  '/maps/emerging-scene-toronto',
   // Add more when you have links, e.g.: '/maps/another-map',
 ];
 

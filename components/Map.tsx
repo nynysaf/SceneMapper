@@ -1,45 +1,7 @@
 import React, { useRef, useEffect, useMemo } from 'react';
 import * as d3 from 'd3';
 import { MapNode, MapConnection, NodeType } from '../types';
-
-/** Seeded PRNG (mulberry32) so the same map slug always produces the same landmass. */
-function seedFromString(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) {
-    h = Math.imul(31, h) + s.charCodeAt(i) | 0;
-  }
-  return h >>> 0;
-}
-function mulberry32(seed: number): () => number {
-  return function () {
-    let t = (seed += 0x6d2b79f5);
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-/** Generate a random blob path (pale landmass) for the default map. Same seed => same shape. */
-function generateLandmassPath(seedString: string): string {
-  const seed = seedFromString(seedString);
-  const rnd = mulberry32(seed);
-  const cx = 500;
-  const cy = 500;
-  const rx = 320 + rnd() * 80;
-  const ry = 260 + rnd() * 60;
-  const n = 14 + Math.floor(rnd() * 6);
-  const points: [number, number][] = [];
-  for (let i = 0; i < n; i++) {
-    const angle = (i / n) * 2 * Math.PI + (rnd() - 0.5) * 0.5;
-    const r = 0.85 + rnd() * 0.3;
-    points.push([
-      cx + Math.cos(angle) * rx * r + (rnd() - 0.5) * 40,
-      cy + Math.sin(angle) * ry * r + (rnd() - 0.5) * 40,
-    ]);
-  }
-  const line = d3.line().curve(d3.curveCatmullRomClosed).x((d) => d[0]).y((d) => d[1]);
-  return line(points) ?? '';
-}
+import { generateLandmass } from '../lib/landmass-generator';
 
 /** Style for connection lines (from MapTheme.connectionLine). */
 export interface ConnectionLineStyle {
@@ -109,6 +71,11 @@ interface MapProps {
    * When true, the map is being captured for export: zoom is disabled and transform is identity.
    */
   exportMode?: boolean;
+  /**
+   * Colour behind the map image (visible when image doesn't fill the viewport).
+   * Default #fdfcf0.
+   */
+  mapBackgroundColor?: string;
 }
 
 /**
@@ -138,6 +105,7 @@ const Map: React.FC<MapProps> = ({
   currentUserName,
   onConnectionCurveChange,
   exportMode = false,
+  mapBackgroundColor = '#fdfcf0',
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const dragStartRef = useRef({ x: 0, y: 0 });
@@ -150,8 +118,8 @@ const Map: React.FC<MapProps> = ({
     thickness: 2,
   };
 
-  const defaultLandmassPath = useMemo(
-    () => generateLandmassPath(mapSlug ?? 'default'),
+  const defaultLandmass = useMemo(
+    () => generateLandmass(mapSlug ?? 'default'),
     [mapSlug],
   );
 
@@ -319,7 +287,8 @@ const Map: React.FC<MapProps> = ({
         .style('paint-order', isRegion ? undefined : 'stroke')
         .style('stroke', isRegion ? undefined : '#fdfcf0')
         .style('stroke-width', isRegion ? undefined : '4px')
-        .style('stroke-linecap', isRegion ? undefined : 'round');
+        .style('stroke-linecap', isRegion ? undefined : 'round')
+        .style('stroke-linejoin', isRegion ? undefined : 'round');
     });
 
     // --- Interaction Logic ---
@@ -402,8 +371,8 @@ const Map: React.FC<MapProps> = ({
       ref={svgRef} 
       viewBox="0 0 1000 1000"
       preserveAspectRatio="xMidYMid slice"
-      className={`w-full h-full bg-[#fdfcf0] selection:bg-none outline-none ${isPlacing ? 'cursor-crosshair' : ''}`}
-      style={{ touchAction: 'none' }}
+      className={`w-full h-full selection:bg-none outline-none ${isPlacing ? 'cursor-crosshair' : ''}`}
+      style={{ touchAction: 'none', backgroundColor: mapBackgroundColor }}
     >
       <defs>
         {!backgroundImageUrl && (
@@ -432,22 +401,44 @@ const Map: React.FC<MapProps> = ({
           />
         ) : (
           <>
-            {/* Default: pale landmass surrounded by water (shape seeded by map slug) */}
+            {/* Default: procedural landmass (bays, inlets, islands, lakes) – shape seeded by map slug */}
             <rect width="1000" height="1000" fill="#c5dce8" pointerEvents="all" />
             <path
-              d={defaultLandmassPath}
+              d={defaultLandmass.mainPath}
               fill="#e8e6d9"
+              fillRule="evenodd"
               stroke="#d4d2c4"
               strokeWidth="2"
               opacity="0.95"
               pointerEvents="none"
             />
             <path
-              d={defaultLandmassPath}
+              d={defaultLandmass.mainPath}
               fill="url(#grid)"
               fillOpacity="0.12"
+              fillRule="evenodd"
               pointerEvents="none"
             />
+            {defaultLandmass.islandPaths.map((islandPath, i) => (
+              <path
+                key={i}
+                d={islandPath}
+                fill="#e8e6d9"
+                stroke="#d4d2c4"
+                strokeWidth="2"
+                opacity="0.95"
+                pointerEvents="none"
+              />
+            ))}
+            {defaultLandmass.islandPaths.map((islandPath, i) => (
+              <path
+                key={`grid-${i}`}
+                d={islandPath}
+                fill="url(#grid)"
+                fillOpacity="0.12"
+                pointerEvents="none"
+              />
+            ))}
           </>
         )}
 
