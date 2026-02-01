@@ -32,11 +32,11 @@ const AdminReviewModal: React.FC<AdminReviewModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-emerald-950/40 backdrop-blur-md"
+      className="fixed inset-0 z-[70] flex items-center justify-center p-4 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] bg-emerald-950/40 backdrop-blur-md"
       onClick={onClose}
     >
       <div
-        className="glass w-full max-w-2xl rounded-[2.5rem] solarpunk-shadow overflow-hidden flex flex-col animate-in fade-in zoom-in duration-300 max-h-[85vh]"
+        className="glass w-full max-w-2xl rounded-[2.5rem] solarpunk-shadow overflow-hidden flex flex-col animate-in fade-in zoom-in duration-300 max-h-[min(85vh,calc(100vh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-2rem))]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-8 border-b border-emerald-100 flex justify-between items-center bg-white/60">

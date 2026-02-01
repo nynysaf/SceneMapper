@@ -676,85 +676,81 @@ const MapExperience: React.FC<MapExperienceProps> = ({
   };
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden flex flex-col md:flex-row">
-      {/* --- Top UI Layer --- */}
-      <div className="absolute top-0 left-0 right-0 z-50 p-4 pointer-events-none flex justify-between items-start">
-        <div className="pointer-events-auto flex items-center gap-4">
-          <div className="glass p-3 rounded-2xl solarpunk-shadow flex items-center gap-3">
+    <div className="relative w-screen h-screen overflow-hidden flex flex-col">
+      {/* --- Top: map card + role card only (no full-width bar) --- */}
+      <header className="absolute top-0 left-0 right-0 z-50 pointer-events-none pt-[max(env(safe-area-inset-top),0.75rem)] px-3 md:px-4 flex justify-between items-start">
+        {/* Map card — top-left */}
+        <div className="pointer-events-auto glass p-2 md:p-3 rounded-xl md:rounded-2xl solarpunk-shadow flex items-center gap-2 md:gap-3 min-w-0">
             <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-sm shrink-0 overflow-hidden"
+              className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl flex items-center justify-center text-white font-bold text-xs md:text-sm shrink-0 overflow-hidden"
               style={{ backgroundColor: map?.iconBackground ?? mapTheme?.primaryColor ?? '#059669' }}
             >
               {map?.icon && (map.icon.startsWith('data:') || map.icon.startsWith('http')) ? (
                 <img src={map.icon} alt="" className="w-full h-full object-cover" />
               ) : map?.icon ? (
-                <span className="text-lg">{map.icon}</span>
+                <span className="text-base md:text-lg">{map.icon}</span>
               ) : (
                 mapTitle.split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase().slice(0, 2) || '?'
               )}
             </div>
-            <div>
-              <h1 className="text-xl font-bold text-emerald-900 leading-tight">{mapTitle}</h1>
+            <div className="min-w-0">
+              <h1 className="text-base md:text-xl font-bold text-emerald-900 leading-tight truncate">{mapTitle}</h1>
               <Link
                 href="/"
-                className="text-xs text-emerald-700 font-medium hover:text-emerald-900 hover:underline"
+                className="text-[10px] md:text-xs text-emerald-700 font-medium hover:text-emerald-900 hover:underline"
               >
                 {mapSubtitle}
               </Link>
             </div>
-          </div>
-          <div className="flex items-center gap-2">
-          {/* Edit map settings now lives as a gear icon in the sidebar */}
-            {canShowJoin && (
-              <button
-                onClick={() => {
-                  setIsJoinOpen(true);
-                  setJoinPassword('');
-                  setJoinError(null);
-                }}
-                className="pointer-events-auto glass px-3 py-2 rounded-xl text-[11px] font-semibold text-emerald-800 hover:bg-emerald-50 transition-colors"
-              >
-                Join as collaborator
-              </button>
-            )}
-          </div>
+        </div>
+        {/* Role/mode + Join + Review — top-right */}
+        <div className="pointer-events-auto flex items-center gap-2 shrink-0">
+          {canShowJoin && (
+            <button
+              onClick={() => {
+                setIsJoinOpen(true);
+                setJoinPassword('');
+                setJoinError(null);
+              }}
+              className="glass px-2 py-1.5 md:px-3 md:py-2 rounded-lg md:rounded-xl text-[10px] md:text-[11px] font-semibold text-emerald-800 hover:bg-emerald-50 transition-colors"
+            >
+              Join as collaborator
+            </button>
+          )}
           <button
             onClick={switchRole}
-            className="pointer-events-auto glass px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 text-emerald-800 hover:bg-emerald-50 transition-colors"
+            className="glass px-3 py-1.5 md:px-4 md:py-2 rounded-lg md:rounded-xl text-xs md:text-sm font-semibold flex items-center gap-1 md:gap-2 text-emerald-800 hover:bg-emerald-50 transition-colors min-h-[44px] md:min-h-0"
           >
             {userSession.role === 'admin' ? (
-              <ShieldCheck size={18} />
+              <ShieldCheck size={16} className="md:w-[18px] md:h-[18px]" />
             ) : userSession.role === 'collaborator' ? (
-              <Users size={18} />
+              <Users size={16} className="md:w-[18px] md:h-[18px]" />
             ) : (
-              <Info size={18} />
+              <Info size={16} className="md:w-[18px] md:h-[18px]" />
             )}
-            {userSession.role.charAt(0).toUpperCase() + userSession.role.slice(1)}
+            <span className="hidden sm:inline">{userSession.role.charAt(0).toUpperCase() + userSession.role.slice(1)}</span>
           </button>
-        </div>
-
-        <div className="pointer-events-auto flex gap-2">
           {userSession.role === 'admin' && pendingReviewCount > 0 && (
             <button
               onClick={() => setIsAdminReviewOpen(true)}
-              className="bg-amber-100 text-amber-800 p-3 rounded-2xl solarpunk-shadow hover:bg-amber-200 transition-transform active:scale-95 flex items-center gap-2 px-5 font-bold relative"
+              className="bg-amber-100 text-amber-800 p-2 md:p-3 rounded-xl md:rounded-2xl solarpunk-shadow hover:bg-amber-200 transition-transform active:scale-95 flex items-center gap-1 md:gap-2 px-3 md:px-5 font-bold relative min-h-[44px] md:min-h-0"
             >
-              <Inbox size={20} />
+              <Inbox size={18} className="md:w-5 md:h-5" />
               <span className="hidden md:inline">Review Queue</span>
-              <span className="absolute -top-2 -right-2 bg-amber-600 text-white text-[10px] w-6 h-6 rounded-full flex items-center justify-center border-2 border-white">
+              <span className="absolute -top-1 -right-1 md:-top-2 md:-right-2 bg-amber-600 text-white text-[9px] md:text-[10px] w-5 h-5 md:w-6 md:h-6 rounded-full flex items-center justify-center border-2 border-white">
                 {pendingReviewCount}
               </span>
             </button>
           )}
         </div>
-      </div>
+      </header>
 
       {/* Placement Tooltip */}
       {pendingNode && (
-        <div className="absolute top-24 left-1/2 -translate-x-1/2 z-[60] animate-bounce">
-          <div className="bg-emerald-600 text-white px-6 py-3 rounded-full solarpunk-shadow flex items-center gap-3 font-bold border-2 border-white">
-            <MapPin size={20} />
-            Click on the map to place &quot;{pendingNode.title}&quot;
+        <div className="absolute top-20 md:top-24 left-1/2 -translate-x-1/2 z-[60] animate-bounce px-2">
+          <div className="bg-emerald-600 text-white px-4 py-2.5 md:px-6 md:py-3 rounded-full solarpunk-shadow flex items-center gap-2 md:gap-3 font-bold border-2 border-white text-sm md:text-base">
+            <MapPin size={18} className="md:w-5 md:h-5 shrink-0" />
+            <span>Tap or click on the map to place &quot;{pendingNode.title}&quot;</span>
             <button
               onClick={() => setPendingNode(null)}
               className="ml-2 bg-white/20 hover:bg-white/30 p-1 rounded-full transition-colors"
@@ -765,10 +761,10 @@ const MapExperience: React.FC<MapExperienceProps> = ({
         </div>
       )}
 
-      {/* Join as collaborator modal */}
+      {/* Join as collaborator modal — safe area insets for notches/home indicator */}
       {isJoinOpen && (
         <div
-          className="absolute inset-0 z-[65] flex items-center justify-center bg-emerald-950/30 backdrop-blur-sm px-4"
+          className="absolute inset-0 z-[65] flex items-center justify-center bg-emerald-950/30 backdrop-blur-sm px-4 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
           onClick={() => {
             setIsJoinOpen(false);
             setJoinPassword('');
@@ -776,7 +772,7 @@ const MapExperience: React.FC<MapExperienceProps> = ({
           }}
         >
           <div
-            className="glass w-full max-w-md rounded-3xl solarpunk-shadow overflow-hidden"
+            className="glass w-full max-w-md rounded-3xl solarpunk-shadow overflow-hidden max-h-[calc(100vh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-2rem)] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-5 border-b border-emerald-100 flex justify-between items-center bg-white/60">
@@ -900,6 +896,12 @@ const MapExperience: React.FC<MapExperienceProps> = ({
           }
           currentUserName={userSession.name}
           onConnectionCurveChange={userSession.role !== 'public' ? handleConnectionCurveChange : undefined}
+          onConnectionCreate={
+            connectionsEnabled && userSession.role !== 'public'
+              ? (fromId, toId) =>
+                  handleSubmitConnection({ fromNodeId: fromId, toNodeId: toId, description: '' })
+              : undefined
+          }
           connectionLineStyle={mapTheme?.connectionLine ?? (mapTheme ? { color: mapTheme.primaryColor, opacity: 0.6, thickness: 2 } : undefined)}
           mapBackgroundColor={mapTheme?.backgroundColor}
         />
@@ -931,11 +933,11 @@ const MapExperience: React.FC<MapExperienceProps> = ({
         )}
       </main>
 
-      {/* Floating Action Button (FAB) + Admin review button */}
+      {/* Floating Action Button (FAB) + Admin review button — on mobile, shift left when sidebar open to avoid overlap */}
       {!pendingNode && (
         <div
-          className={`fixed bottom-24 right-6 md:bottom-10 z-[55] flex items-center gap-3 transition-[right] duration-300 ${
-            sidebarCollapsed ? 'md:right-[90px]' : 'md:right-[410px]'
+          className={`fixed z-[55] flex items-center gap-3 transition-[right] duration-300 bottom-[max(1.5rem,env(safe-area-inset-bottom))] md:bottom-10 ${
+            sidebarCollapsed ? 'right-4 md:right-[90px]' : 'right-[calc(min(90vw,24rem)+1rem)] md:right-[410px]'
           }`}
         >
           {userSession.role === 'admin' && pendingReviewCount > 0 && (
@@ -1044,14 +1046,14 @@ const MapExperience: React.FC<MapExperienceProps> = ({
         />
       )}
 
-      {/* Edit node modal */}
+      {/* Edit node modal — safe area insets */}
       {isEditOpen && selectedNode && (
         <div
-          className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-emerald-950/20 backdrop-blur-sm"
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] bg-emerald-950/20 backdrop-blur-sm"
           onClick={() => setIsEditOpen(false)}
         >
           <div
-            className="glass w-full max-w-lg rounded-3xl solarpunk-shadow overflow-hidden flex flex-col animate-in fade-in zoom-in duration-300"
+            className="glass w-full max-w-lg rounded-3xl solarpunk-shadow overflow-hidden flex flex-col animate-in fade-in zoom-in duration-300 max-h-[calc(100vh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-2rem)] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-6 border-b border-emerald-100 flex justify-between items-center bg-white/50">
@@ -1106,14 +1108,14 @@ const MapExperience: React.FC<MapExperienceProps> = ({
         </div>
       )}
 
-      {/* Delete confirmation modal */}
+      {/* Delete confirmation modal — safe area insets */}
       {isDeleteConfirmOpen && selectedNode && (
         <div
-          className="fixed inset-0 z-[65] flex items-center justify-center p-4 bg-emerald-950/30 backdrop-blur-sm"
+          className="fixed inset-0 z-[65] flex items-center justify-center p-4 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] bg-emerald-950/30 backdrop-blur-sm"
           onClick={() => setIsDeleteConfirmOpen(false)}
         >
           <div
-            className="glass w-full max-w-sm rounded-3xl solarpunk-shadow overflow-hidden flex flex-col animate-in fade-in zoom-in duration-300"
+            className="glass w-full max-w-sm rounded-3xl solarpunk-shadow overflow-hidden flex flex-col animate-in fade-in zoom-in duration-300 max-h-[calc(100vh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-2rem)] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-5 border-b border-emerald-100 bg-white/60 flex justify-between items-center">

@@ -597,8 +597,8 @@ const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col md:flex-row px-6 md:px-12 py-8 gap-8">
-        <section className="flex-1 max-w-xl space-y-4">
+      <main className="flex-1 flex flex-col md:flex-row px-4 sm:px-6 md:px-12 py-6 md:py-8 gap-6 md:gap-8 pb-[env(safe-area-inset-bottom)]">
+        <section className="flex-1 max-w-xl space-y-4 min-w-0">
           <h2 className="text-2xl md:text-3xl font-bold text-emerald-950">
             {editingMapId ? 'Edit your map' : 'Map your scene, your way.'}
           </h2>
@@ -779,7 +779,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                           </label>
                           <input
                             type="color"
-                            className="h-8 w-full rounded-md border border-emerald-100 bg-white/70"
+                            className="h-8 min-h-[44px] w-full rounded-md border border-emerald-100 bg-white/70 touch-manipulation"
                             value={customEventColor}
                             onChange={(e) => {
                               setCustomEventColor(e.target.value);
@@ -795,7 +795,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                           </label>
                           <input
                             type="color"
-                            className="h-8 w-full rounded-md border border-emerald-100 bg-white/70"
+                            className="h-8 min-h-[44px] w-full rounded-md border border-emerald-100 bg-white/70 touch-manipulation"
                             value={customPersonColor}
                             onChange={(e) => {
                               setCustomPersonColor(e.target.value);
@@ -811,7 +811,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                           </label>
                           <input
                             type="color"
-                            className="h-8 w-full rounded-md border border-emerald-100 bg-white/70"
+                            className="h-8 min-h-[44px] w-full rounded-md border border-emerald-100 bg-white/70 touch-manipulation"
                             value={customSpaceColor}
                             onChange={(e) => {
                               setCustomSpaceColor(e.target.value);
@@ -827,7 +827,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                           </label>
                           <input
                             type="color"
-                            className="h-8 w-full rounded-md border border-emerald-100 bg-white/70"
+                            className="h-8 min-h-[44px] w-full rounded-md border border-emerald-100 bg-white/70 touch-manipulation"
                             value={customCommunityColor}
                             onChange={(e) => {
                               setCustomCommunityColor(e.target.value);
@@ -843,7 +843,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                           </label>
                           <input
                             type="color"
-                            className="h-8 w-full rounded-md border border-emerald-100 bg-white/70"
+                            className="h-8 min-h-[44px] w-full rounded-md border border-emerald-100 bg-white/70 touch-manipulation"
                             value={customRegionColor}
                             onChange={(e) => {
                               setCustomRegionColor(e.target.value);
@@ -859,7 +859,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                           </label>
                           <input
                             type="color"
-                            className="h-8 w-full rounded-md border border-emerald-100 bg-white/70"
+                            className="h-8 min-h-[44px] w-full rounded-md border border-emerald-100 bg-white/70 touch-manipulation"
                             value={customMapBackgroundColor}
                             onChange={(e) => {
                               setCustomMapBackgroundColor(e.target.value);
@@ -906,7 +906,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                             </label>
                             <input
                               type="color"
-                              className="h-8 w-full rounded-md border border-emerald-100 bg-white/70"
+                              className="h-8 min-h-[44px] w-full rounded-md border border-emerald-100 bg-white/70 touch-manipulation"
                               value={customConnectionLineColor}
                               onChange={(e) => {
                                 setCustomConnectionLineColor(e.target.value);
@@ -923,7 +923,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                               min={0}
                               max={1}
                               step={0.1}
-                              className="w-full h-8"
+                              className="w-full min-h-[44px] touch-manipulation"
                               value={customConnectionLineOpacity}
                               onChange={(e) => {
                                 setCustomConnectionLineOpacity(Number(e.target.value));
@@ -942,7 +942,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                               type="number"
                               min={1}
                               max={6}
-                              className="w-full h-8 bg-white/70 border border-emerald-100 rounded-md px-2 text-sm"
+                              className="w-full min-h-[44px] bg-white/70 border border-emerald-100 rounded-md px-2 text-sm touch-manipulation"
                               value={customConnectionLineThickness}
                               onChange={(e) => {
                                 const v = Number(e.target.value);
@@ -1710,7 +1710,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 <div className="flex gap-2 items-center">
                   <input
                     type="color"
-                    className="h-10 w-20 rounded-lg border border-emerald-100 bg-white/70"
+                    className="h-10 min-h-[44px] w-20 rounded-lg border border-emerald-100 bg-white/70 touch-manipulation"
                     value={mapIconBackground}
                     onChange={(e) => setMapIconBackground(e.target.value)}
                   />

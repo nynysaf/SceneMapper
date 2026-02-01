@@ -68,6 +68,11 @@ interface MapProps {
    */
   onConnectionCurveChange?: (connectionId: string, curveOffsetX: number, curveOffsetY: number) => void;
   /**
+   * Called when user Alt+drags from one node to another to create a connection.
+   * REGION nodes are excluded as source and target.
+   */
+  onConnectionCreate?: (fromNodeId: string, toNodeId: string) => void;
+  /**
    * When true, the map is being captured for export: zoom is disabled and transform is identity.
    */
   exportMode?: boolean;
@@ -104,12 +109,14 @@ const Map: React.FC<MapProps> = ({
   connectionLineStyle,
   currentUserName,
   onConnectionCurveChange,
+  onConnectionCreate,
   exportMode = false,
   mapBackgroundColor = '#fdfcf0',
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const dragStartRef = useRef({ x: 0, y: 0 });
   const dragJustEndedRef = useRef(false); // kept for backwards compat with any cached bundles; unused
+  const connectionDragCleanupRef = useRef<(() => void) | null>(null);
   const DRAG_THRESHOLD_SQ = 25; // 5px movement = real drag (below = treat as click)
 
   const lineStyle = connectionLineStyle ?? {
@@ -293,6 +300,85 @@ const Map: React.FC<MapProps> = ({
 
     // --- Interaction Logic ---
 
+    // Alt+drag from node to node creates a connection (REGION excluded)
+    if (isEditable && !isPlacing && onConnectionCreate) {
+      nodeGroups.on('pointerdown.alt-connection', function (event: PointerEvent, d: MapNode) {
+        if (!event.altKey || d.type === NodeType.REGION) return;
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+
+        const sourceNode = d;
+        const sourceX = sourceNode.x * SCALE;
+        const sourceY = sourceNode.y * SCALE;
+
+        const previewGroup = container.append('g').attr('class', 'connection-preview');
+        const previewPath = previewGroup
+          .append('path')
+          .attr('fill', 'none')
+          .attr('stroke', lineStyle.color)
+          .attr('stroke-opacity', lineStyle.opacity)
+          .attr('stroke-width', lineStyle.thickness)
+          .attr('stroke-linecap', 'round')
+          .attr('stroke-dasharray', '6,4');
+
+        const updatePreview = (clientX: number, clientY: number) => {
+          const pt = svgRef.current!.createSVGPoint();
+          pt.x = clientX;
+          pt.y = clientY;
+          const svgP = pt.matrixTransform(container.node()!.getScreenCTM()!.inverse());
+          const cx = (sourceX + svgP.x) / 2;
+          const cy = (sourceY + svgP.y) / 2;
+          previewPath.attr('d', `M ${sourceX} ${sourceY} Q ${cx} ${cy} ${svgP.x} ${svgP.y}`);
+        };
+
+        const cleanup = () => {
+          previewGroup.remove();
+          document.removeEventListener('pointermove', onMove);
+          document.removeEventListener('pointerup', onUp);
+          document.removeEventListener('keydown', onEscape);
+          document.body.style.cursor = '';
+          connectionDragCleanupRef.current = null;
+        };
+        connectionDragCleanupRef.current = cleanup;
+        document.body.style.cursor = 'crosshair';
+
+        const onMove = (e: MouseEvent) => updatePreview(e.clientX, e.clientY);
+        const onUp = (e: MouseEvent) => {
+          // Coordinate-based hit test (preview path is on top, so elementFromPoint would miss nodes)
+          const pt = svgRef.current!.createSVGPoint();
+          pt.x = e.clientX;
+          pt.y = e.clientY;
+          const svgP = pt.matrixTransform(container.node()!.getScreenCTM()!.inverse());
+          const hitRadius = 25 * nodeSizeScale; // generous: covers node glow
+          let best: MapNode | null = null;
+          let bestDist = hitRadius * hitRadius;
+          for (const n of nodes) {
+            if (n.type === NodeType.REGION || n.id === sourceNode.id) continue;
+            const nx = n.x * SCALE;
+            const ny = n.y * SCALE;
+            const dx = svgP.x - nx;
+            const dy = svgP.y - ny;
+            const d2 = dx * dx + dy * dy;
+            if (d2 < bestDist) {
+              bestDist = d2;
+              best = n;
+            }
+          }
+          if (best) onConnectionCreate(sourceNode.id, best.id);
+          cleanup();
+        };
+        const onEscape = (e: KeyboardEvent) => {
+          if (e.key === 'Escape') cleanup();
+        };
+
+        document.addEventListener('pointermove', onMove);
+        document.addEventListener('pointerup', onUp);
+        document.addEventListener('keydown', onEscape);
+        updatePreview(event.clientX, event.clientY);
+      }, { capture: true });
+    }
+
     // Enable Drag and Drop for authorized roles
     if (isEditable && !isPlacing) {
       const drag = d3.drag<SVGGElement, MapNode>()
@@ -364,7 +450,11 @@ const Map: React.FC<MapProps> = ({
       }
     });
 
-  }, [nodes, connections, currentUserName, lineStyle, onNodeMove, onNodeSelect, onMapClick, isEditable, isPlacing, nodeSizeScale, nodeLabelFontScale, regionFontScale, regionFontFamily, categoryColors, onConnectionCurveChange, exportMode]);
+    // Cleanup Alt+drag listeners if effect re-runs mid-drag
+    return () => {
+      connectionDragCleanupRef.current?.();
+    };
+  }, [nodes, connections, currentUserName, lineStyle, onNodeMove, onNodeSelect, onMapClick, isEditable, isPlacing, nodeSizeScale, nodeLabelFontScale, regionFontScale, regionFontFamily, categoryColors, onConnectionCurveChange, onConnectionCreate, exportMode]);
 
   return (
     <svg 

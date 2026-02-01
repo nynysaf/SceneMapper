@@ -481,7 +481,7 @@ function Sidebar({
 
       {showQR && shareUrl && (
       <div
-        className="fixed inset-0 z-[70] flex items-center justify-center bg-emerald-950/40 backdrop-blur-sm pointer-events-auto"
+        className="fixed inset-0 z-[70] flex items-center justify-center p-4 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] bg-emerald-950/40 backdrop-blur-sm pointer-events-auto"
         onClick={() => setShowQR(false)}
       >
         <div
@@ -507,7 +507,7 @@ function Sidebar({
 
       {showDownloadModal && onDownloadRequested && (
       <div
-        className="fixed inset-0 z-[70] flex items-center justify-center bg-emerald-950/40 backdrop-blur-sm pointer-events-auto"
+        className="fixed inset-0 z-[70] flex items-center justify-center p-4 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] bg-emerald-950/40 backdrop-blur-sm pointer-events-auto"
         onClick={() => setShowDownloadModal(false)}
       >
         <div
@@ -560,7 +560,7 @@ function Sidebar({
 
       {showExportModal && onExportRequested && (
       <div
-        className="fixed inset-0 z-[70] flex items-center justify-center bg-emerald-950/40 backdrop-blur-sm pointer-events-auto"
+        className="fixed inset-0 z-[70] flex items-center justify-center p-4 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] bg-emerald-950/40 backdrop-blur-sm pointer-events-auto"
         onClick={() => setShowExportModal(false)}
       >
         <div

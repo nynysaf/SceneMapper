@@ -50,6 +50,11 @@ const SubmissionModal: React.FC<SubmissionModalProps> = ({
     () => [...approvedNodes].sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base' })),
     [approvedNodes],
   );
+  /** Nodes available for connection From/To — REGION excluded (regions cannot be connected). */
+  const sortedConnectionNodes = useMemo(
+    () => sortedNodes.filter((n) => n.type !== NodeType.REGION),
+    [sortedNodes],
+  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,11 +86,11 @@ const SubmissionModal: React.FC<SubmissionModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-emerald-950/20 backdrop-blur-sm"
+      className="fixed inset-0 z-[60] flex items-center justify-center p-4 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] bg-emerald-950/20 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="glass w-full max-w-lg rounded-3xl solarpunk-shadow overflow-hidden flex flex-col animate-in fade-in zoom-in duration-300"
+        className="glass w-full max-w-lg rounded-3xl solarpunk-shadow overflow-hidden flex flex-col animate-in fade-in zoom-in duration-300 max-h-[calc(100vh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-2rem)] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-6 border-b border-emerald-100 flex justify-between items-center bg-white/50">
@@ -152,7 +157,7 @@ const SubmissionModal: React.FC<SubmissionModalProps> = ({
                   required
                 >
                   <option value="">Select a node</option>
-                  {sortedNodes.map((n) => (
+                  {sortedConnectionNodes.map((n) => (
                     <option key={n.id} value={n.id}>
                       {n.title}
                     </option>
@@ -168,7 +173,7 @@ const SubmissionModal: React.FC<SubmissionModalProps> = ({
                   required
                 >
                   <option value="">Select a node</option>
-                  {sortedNodes.map((n) => (
+                  {sortedConnectionNodes.map((n) => (
                     <option key={n.id} value={n.id} disabled={n.id === connectionFromId}>
                       {n.title}
                     </option>

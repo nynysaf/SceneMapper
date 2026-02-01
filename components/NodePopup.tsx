@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { MapNode, MapTheme } from '../types';
 import { X, ExternalLink, ScrollText, Pencil, Trash2 } from 'lucide-react';
 
@@ -22,11 +22,17 @@ const NodePopup: React.FC<NodePopupProps> = ({
   onEditNode,
   onRequestDeleteNode,
 }) => {
-  const popupWidth = 380;
+  const [popupWidth, setPopupWidth] = useState(380);
+  useEffect(() => {
+    const update = () => setPopupWidth(Math.min(380, typeof window !== 'undefined' ? window.innerWidth - 32 : 380));
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
   const showAbove = anchor.y > 450;
   const gap = 20;
 
-  const left = Math.min(window.innerWidth - popupWidth - 20, Math.max(20, anchor.x - popupWidth / 2));
+  const left = Math.min(window.innerWidth - popupWidth - 20, Math.max(16, anchor.x - popupWidth / 2));
   // When above: position by bottom so the popup sits just above the node (no huge gap). When below: position by top.
   const style: React.CSSProperties = showAbove
     ? { left: `${left}px`, bottom: `${window.innerHeight - anchor.y + gap}px`, width: `${popupWidth}px` }
