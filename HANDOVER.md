@@ -25,7 +25,8 @@ SceneMapper is an interactive, crowd-sourced map application for building "scene
 - `SubmissionModal.tsx`: A user-friendly form with a follow-up spatial placement step on the map.
 
 ## Recent session progress (to pick up)
-- **Dashboard create/edit (Jan 31):** Region font and colour in Themes; layout/spacing fixes (separator, Connection lines, divider); increased font sizes; Create Map button in Your Maps. See `docs/SESSION_SUMMARY.md`.
+- **Export & Sidebar (Jan 31):** CSV/XLSX data export in Share (admin); Share buttons same width; About pane spacing; sidebar stays minimized on node click; Edit settings below filter cards; mobile gap fix; smaller handle; Mode button label; "Click around and find out". See `docs/SESSION_SUMMARY.md`.
+- **Dashboard create/edit (Jan 31):** Region font and colour in Themes; layout/spacing fixes; font sizes; Create Map button in Your Maps.
 - **Speed optimizations (done):** Tier 1–4 complete. Map page uses combined API, parallel fetch, single load effect. See `docs/SPEED_AND_EFFICIENCY_PLAN.md` and `docs/DATA_FLOW.md`.
 - **Custom domain:** scenemapper.ca live. Session cookie shared across apex/www (12 months). Invitation emails use custom domain links. See `docs/SESSION_SUMMARY.md` for env vars and `docs/CUSTOM_DOMAIN_CLOUDFLARE_VERCEL.md` for setup.
 

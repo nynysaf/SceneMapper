@@ -6,6 +6,19 @@ Last updated: Jan 31, 2025
 
 ## What We Did This Session (Jan 31, 2025)
 
+### Export data (admin)
+- **CSV & XLSX export:** Added Export button in Share section (admin only). CSV: one file with Nodes, Regions, Connections sections. XLSX: workbook with three sheets. Filename: `MapName_YYYY-MM-DD.csv` / `.xlsx`. See `lib/export-data.ts`.
+
+### Sidebar & UI tweaks
+- **Share buttons:** Same width (flex-1 min-w-[110px])
+- **About pane:** Reduced gap above it (pt-8 → pt-4)
+- **Sidebar:** No auto-expand on node click; stays minimized if user minimized it
+- **Edit map settings:** Moved below filter cards (admin view)
+- **Mobile:** Reduced gap above filter cards (pt-24 → pt-12)
+- **Sidebar handle:** Smaller, centered vertically (h-20, self-center)
+- **Mode button:** Removed "Mode" label — shows Public, Collaborator, Admin with icons
+- **Bottom-left card:** "Click around and find out"
+
 ### Dashboard create/edit — Themes & UI
 - **Region font and colour:** Added Region colour picker and Region font dropdown (Georgia, Playfair Display, Outfit, Inter, System UI) in Themes section. `MapTheme.regionFont` stored in theme JSON.
 - **Layout/spacing:** Moved separator line to between Show on map and Collaborator password. Adjusted spacing using padding (not margin) to avoid `space-y` override: `pb-8` on color grid (space above Connection lines), `pb-8` on Show on map (space above divider), `pt-3` on Collaborator password (space below divider).
@@ -40,9 +53,11 @@ Last updated: Jan 31, 2025
 
 | File | Change |
 |------|--------|
-| `components/Dashboard.tsx` | Region font/colour in Themes, spacing (pb/pt), font sizes, Create Map button |
+| `lib/export-data.ts` | CSV/XLSX export (toCsv, toXlsx, exportFilename) |
+| `components/MapExperience.tsx` | Export handler, regionFontFamily, mode label, bottom card text |
+| `components/Sidebar.tsx` | Export button/modal, Share button widths, About spacing, no auto-expand, Edit settings below cards, mobile pt, handle size |
+| `components/Dashboard.tsx` | Region font/colour, spacing, font sizes, Create Map button |
 | `components/Map.tsx` | `regionFontFamily` prop for region labels |
-| `components/MapExperience.tsx` | Pass `regionFontFamily` from theme to Map |
 | `types.ts` | `MapTheme.regionFont` |
 | `app/globals.css` | Google Fonts import (Playfair Display, Outfit, Inter) |
 

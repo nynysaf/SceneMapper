@@ -11,6 +11,7 @@ import AdminReviewModal from './AdminReviewModal';
 import { Plus, Info, Users, ShieldCheck, MapPin, Inbox, X } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
+import { toCsv, toXlsx, exportFilename } from '../lib/export-data';
 
 interface MapExperienceProps {
   /**
@@ -475,6 +476,33 @@ const MapExperience: React.FC<MapExperienceProps> = ({
     setExportFormat(format);
   }, []);
 
+  // Export data (CSV or XLSX) - admin only
+  const handleExportRequested = useCallback(
+    (format: 'csv' | 'xlsx') => {
+      const filename = exportFilename(mapTitle ?? 'Map', format);
+      if (format === 'csv') {
+        const csv = toCsv(nodes, connections);
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+      } else {
+        toXlsx(nodes, connections).then((blob) => {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = filename;
+          a.click();
+          URL.revokeObjectURL(url);
+        });
+      }
+    },
+    [nodes, connections, mapTitle]
+  );
+
   useEffect(() => {
     if (!isExporting || !exportFormat) return;
 
@@ -691,7 +719,7 @@ const MapExperience: React.FC<MapExperienceProps> = ({
             ) : (
               <Info size={18} />
             )}
-            Mode: {userSession.role.charAt(0).toUpperCase() + userSession.role.slice(1)}
+            {userSession.role.charAt(0).toUpperCase() + userSession.role.slice(1)}
           </button>
         </div>
 
@@ -959,6 +987,9 @@ const MapExperience: React.FC<MapExperienceProps> = ({
         }
         onCollapsedChange={setSidebarCollapsed}
         onDownloadRequested={mapSlug ? handleDownloadRequested : undefined}
+        onExportRequested={
+          mapSlug && userSession.role === 'admin' ? handleExportRequested : undefined
+        }
         onAddNode={(category) => {
           setSubmissionPresetKind(category);
           setIsSubmissionOpen(true);
@@ -1111,7 +1142,7 @@ const MapExperience: React.FC<MapExperienceProps> = ({
       {/* Contextual Instructions */}
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-40 md:left-6 md:translate-x-0">
         <div className="glass p-3 px-5 rounded-full text-xs font-semibold text-emerald-800 solarpunk-shadow border-emerald-200">
-          🌱 {pendingNode ? 'Select a location on the map.' : 'Click a node to reveal its history.'}
+          🌱 {pendingNode ? 'Select a location on the map.' : 'Click around and find out'}
         </div>
       </div>
     </div>

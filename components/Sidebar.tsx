@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { NodeType, MapNode, MapTheme } from '../types';
-import { X, ExternalLink, Calendar, MapPin, User, Building, Leaf, Globe, Pencil, Trash2, Settings2, Link2, QrCode, Download, Plus } from 'lucide-react';
+import { X, ExternalLink, Calendar, MapPin, User, Building, Leaf, Globe, Pencil, Trash2, Settings2, Link2, QrCode, Download, Plus, FileDown } from 'lucide-react';
 
 /** Squiggly/curved line icon for connection filter (20px, matches other filter icons). */
 function ConnectionLineIcon({ size = 20, className }: { size?: number; className?: string }) {
@@ -50,6 +50,8 @@ interface SidebarProps {
   onCollapsedChange?: (collapsed: boolean) => void;
   /** When set, shows Download in Share section; called with chosen format when user picks one. */
   onDownloadRequested?: (format: 'jpeg' | 'png' | 'pdf') => void;
+  /** When set, shows Export in Share section; called with chosen format (csv/xlsx). Admin only. */
+  onExportRequested?: (format: 'csv' | 'xlsx') => void;
   /** Called when user clicks Plus to add a node; category is preset. Omit or falsy to hide Plus (e.g. public viewers). */
   onAddNode?: (category: NodeType | 'CONNECTION') => void;
 }
@@ -79,19 +81,22 @@ function Sidebar({
   onRegionFontScaleChange,
   onCollapsedChange,
   onDownloadRequested,
+  onExportRequested,
   onAddNode,
 }: SidebarProps) {
   const categoryColors = mapTheme?.categoryColors;
   const [isCollapsed, setIsCollapsed] = React.useState(false);
   const [showDownloadModal, setShowDownloadModal] = React.useState(false);
+  const [showExportModal, setShowExportModal] = React.useState(false);
   React.useEffect(() => {
     onCollapsedChange?.(isCollapsed);
   }, [isCollapsed, onCollapsedChange]);
 
   // Expand sidebar when a node (e.g. region) is selected so options are visible
-  React.useEffect(() => {
-    if (selectedNode) setIsCollapsed(false);
-  }, [selectedNode]);
+  // REMOVED: User wants the sidebar to stay minimized if they minimized it
+  // React.useEffect(() => {
+  //   if (selectedNode) setIsCollapsed(false);
+  // }, [selectedNode]);
   const [linkCopied, setLinkCopied] = React.useState(false);
   const [showQR, setShowQR] = React.useState(false);
   // Set shareUrl only after mount so server and first client render match (avoids hydration error)
@@ -137,17 +142,17 @@ function Sidebar({
           }`}
           style={{ width: 'min(90vw, 24rem)' }}
         >
-          {/* Handle — attached to left of panel, slides with it */}
+          {/* Handle — attached to left of panel, slides with it; centered vertically */}
           <button
             type="button"
             onClick={() => setIsCollapsed((v) => !v)}
-            className="shrink-0 flex items-center justify-center w-7 bg-emerald-100/95 hover:bg-emerald-200 rounded-l-xl border-l border-t border-b border-emerald-200/80 self-stretch"
+            className="shrink-0 flex items-center justify-center w-7 h-20 self-center rounded-l-xl bg-emerald-100/95 hover:bg-emerald-200 border-l border-t border-b border-emerald-200/80"
             style={{ width: handleWidth }}
             aria-label={isCollapsed ? 'Expand panel' : 'Collapse panel'}
           >
             <div className="w-1.5 h-12 rounded-full bg-emerald-500" />
           </button>
-          <div className="h-full flex flex-col p-6 overflow-y-auto pt-24 md:pt-6 glass shadow-2xl flex-1 w-[90vw] max-w-sm md:w-80">
+          <div className="h-full flex flex-col p-6 overflow-y-auto pt-12 md:pt-6 glass shadow-2xl flex-1 w-[90vw] max-w-sm md:w-80">
         {selectedNode ? (
           <div className="flex flex-col gap-4 relative">
             {userRole === 'admin' && onEditMapSettings && !isNodePopupOpen && (
@@ -249,19 +254,6 @@ function Sidebar({
           </div>
         ) : (
           <div className="space-y-8">
-            {userRole === 'admin' && onEditMapSettings && !isNodePopupOpen && (
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={onEditMapSettings}
-                  className="p-2 rounded-full bg-white/70 text-emerald-800 shadow hover:bg-white shrink-0"
-                  title="Edit map settings"
-                >
-                  <Settings2 size={20} />
-                </button>
-              </div>
-            )}
-
             <div className="grid grid-cols-1 gap-3">
               {filterOptions.map(({ type, label, icon: Icon }) => {
                 const isActive = activeFilters.includes(type);
@@ -351,6 +343,20 @@ function Sidebar({
               )}
             </div>
 
+            {userRole === 'admin' && onEditMapSettings && !isNodePopupOpen && (
+              <div className="flex justify-center">
+                <button
+                  type="button"
+                  onClick={onEditMapSettings}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/70 text-emerald-800 shadow hover:bg-white text-sm font-medium"
+                  title="Edit map settings"
+                >
+                  <Settings2 size={18} />
+                  Edit map settings
+                </button>
+              </div>
+            )}
+
             {mounted && userRole === 'admin' && onNodeSizeScaleChange && (
               <div className="space-y-2">
                 <h3 className="text-sm font-bold text-emerald-900">Node size</h3>
@@ -418,7 +424,7 @@ function Sidebar({
                   <button
                     type="button"
                     onClick={copyShareLink}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${linkCopied ? 'bg-emerald-100 text-emerald-800' : 'bg-white/70 text-emerald-800 hover:bg-emerald-50 border border-emerald-100'}`}
+                    className={`flex-1 min-w-[110px] flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${linkCopied ? 'bg-emerald-100 text-emerald-800' : 'bg-white/70 text-emerald-800 hover:bg-emerald-50 border border-emerald-100'}`}
                   >
                     <Link2 size={16} />
                     {linkCopied ? 'Copied!' : 'Copy link'}
@@ -426,7 +432,7 @@ function Sidebar({
                   <button
                     type="button"
                     onClick={() => setShowQR(true)}
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium bg-white/70 text-emerald-800 hover:bg-emerald-50 border border-emerald-100"
+                    className="flex-1 min-w-[110px] flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-medium bg-white/70 text-emerald-800 hover:bg-emerald-50 border border-emerald-100"
                   >
                     <QrCode size={16} />
                     QR code
@@ -435,17 +441,27 @@ function Sidebar({
                     <button
                       type="button"
                       onClick={() => setShowDownloadModal(true)}
-                      className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium bg-white/70 text-emerald-800 hover:bg-emerald-50 border border-emerald-100"
+                      className="flex-1 min-w-[110px] flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-medium bg-white/70 text-emerald-800 hover:bg-emerald-50 border border-emerald-100"
                     >
                       <Download size={16} />
                       Download
+                    </button>
+                  )}
+                  {onExportRequested && (
+                    <button
+                      type="button"
+                      onClick={() => setShowExportModal(true)}
+                      className="flex-1 min-w-[110px] flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-medium bg-white/70 text-emerald-800 hover:bg-emerald-50 border border-emerald-100"
+                    >
+                      <FileDown size={16} />
+                      Export
                     </button>
                   )}
                 </div>
               </div>
             )}
 
-            <div className="mt-auto pt-8">
+            <div className="mt-auto pt-4">
               <div className="p-4 bg-emerald-900 rounded-2xl text-white solarpunk-shadow">
                 <h3 className="font-bold mb-2 flex items-center gap-2">
                   <Leaf size={18} className="text-emerald-300" />
@@ -534,6 +550,49 @@ function Sidebar({
           <button
             type="button"
             onClick={() => setShowDownloadModal(false)}
+            className="text-sm font-medium text-emerald-700 px-4 py-2 rounded-xl hover:bg-emerald-50 mt-1"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+      )}
+
+      {showExportModal && onExportRequested && (
+      <div
+        className="fixed inset-0 z-[70] flex items-center justify-center bg-emerald-950/40 backdrop-blur-sm pointer-events-auto"
+        onClick={() => setShowExportModal(false)}
+      >
+        <div
+          className="bg-white rounded-2xl p-5 shadow-xl flex flex-col items-stretch gap-3 min-w-[200px]"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <p className="text-sm font-semibold text-emerald-900">Export data as</p>
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                onExportRequested('csv');
+                setShowExportModal(false);
+              }}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-100"
+            >
+              CSV
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onExportRequested('xlsx');
+                setShowExportModal(false);
+              }}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-100"
+            >
+              XLSX
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowExportModal(false)}
             className="text-sm font-medium text-emerald-700 px-4 py-2 rounded-xl hover:bg-emerald-50 mt-1"
           >
             Cancel
