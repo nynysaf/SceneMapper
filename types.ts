@@ -72,6 +72,10 @@ export interface MapTheme {
     opacity: number;
     thickness: number;
   };
+  /**
+   * Font family for REGION node labels. When absent, use system serif.
+   */
+  regionFont?: string;
 }
 
 /**

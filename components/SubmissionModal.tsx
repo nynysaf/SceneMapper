@@ -16,6 +16,8 @@ interface SubmissionModalProps {
   enabledNodeTypes?: NodeType[];
   /** When false, CONNECTION option is hidden. Default true. */
   connectionsEnabled?: boolean;
+  /** When set, opens with this category/kind preselected. */
+  presetKind?: NodeType | 'CONNECTION' | null;
 }
 
 const SubmissionModal: React.FC<SubmissionModalProps> = ({
@@ -26,12 +28,13 @@ const SubmissionModal: React.FC<SubmissionModalProps> = ({
   approvedNodes = [],
   enabledNodeTypes,
   connectionsEnabled = true,
+  presetKind = null,
 }) => {
-  const [submissionKind, setSubmissionKind] = useState<SubmissionKind>(null);
+  const [submissionKind, setSubmissionKind] = useState<SubmissionKind>(presetKind ?? null);
   const [formData, setFormData] = useState<Partial<MapNode>>({
     title: '',
     description: '',
-    type: undefined,
+    type: presetKind && presetKind !== 'CONNECTION' ? presetKind : undefined,
     tags: [],
     primaryTag: '',
     website: '',

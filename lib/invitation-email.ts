@@ -46,6 +46,7 @@ function substitute(template: string, mapTitle: string, origin: string, slug: st
 
 export type InvitationRole = 'admin' | 'collaborator';
 
+/** Both admin and collaborator use getOrigin() for {origin} in links. */
 export function getInvitationSubject(map: SceneMap, role: InvitationRole): string {
   const raw =
     role === 'admin'
@@ -54,6 +55,7 @@ export function getInvitationSubject(map: SceneMap, role: InvitationRole): strin
   return substitute(raw, map.title, getOrigin(), map.slug);
 }
 
+/** Both admin and collaborator use getOrigin() for {origin}/maps/{slug} and {origin}/dashboard. */
 export function getInvitationBody(map: SceneMap, role: InvitationRole): string {
   const raw =
     role === 'admin'
@@ -62,15 +64,23 @@ export function getInvitationBody(map: SceneMap, role: InvitationRole): string {
   return substitute(raw, map.title, getOrigin(), map.slug);
 }
 
+/**
+ * Base URL for links in invitation emails (e.g. https://scenemapper.ca).
+ * Prefer NEXT_PUBLIC_APP_URL so custom domains are used instead of vercel.app.
+ */
 function getOrigin(): string {
-  if (typeof process !== 'undefined' && process.env?.VERCEL_URL) {
-    const url = process.env.VERCEL_URL;
-    return url.startsWith('http') ? url : `https://${url}`;
+  if (typeof process !== 'undefined') {
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_APP_ORIGIN;
+    if (appUrl) {
+      const url = appUrl.trim();
+      return url.startsWith('http') ? url.replace(/\/+$/, '') : `https://${url.replace(/\/+$/, '')}`;
+    }
+    if (process.env.VERCEL_URL) {
+      const url = process.env.VERCEL_URL;
+      return url.startsWith('http') ? url : `https://${url}`;
+    }
   }
-  if (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_APP_ORIGIN) {
-    return process.env.NEXT_PUBLIC_APP_ORIGIN;
-  }
-  return 'https://scenemapper.example.com';
+  return 'https://scenemapper.ca';
 }
 
 const FROM_NAME_DEFAULT = 'Scene Mapper';

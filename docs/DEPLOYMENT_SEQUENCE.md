@@ -86,7 +86,8 @@ Use this order so each step has what it needs. **Step 1** is first.
    - `NEXT_PUBLIC_USE_BACKEND` = `true`
    - `SUPABASE_URL` = (from Supabase: Project Settings → API → Project URL)
    - `SUPABASE_SERVICE_ROLE_KEY` = (from Supabase: Project Settings → API → service_role key)
-   - `NEXT_PUBLIC_APP_URL` = leave empty for now (or set to your Vercel URL after first deploy, e.g. `https://your-project.vercel.app`)
+   - `NEXT_PUBLIC_APP_URL` = your app URL (Vercel URL or custom domain, e.g. `https://scenemapper.ca`). Used for invitation email links.
+   - (Optional) `SESSION_COOKIE_DOMAIN` = apex domain (e.g. `scenemapper.ca`) if using custom domain; ensures login persists across apex and www.
 
    Apply to **Production**, **Preview**, and **Development** if you use them.
 
@@ -114,7 +115,11 @@ Use this order so each step has what it needs. **Step 1** is first.
 
 4. After DNS propagates (minutes to hours), Vercel will show the domain as verified. Your app will then be reachable at that domain.
 
-5. Set **`NEXT_PUBLIC_APP_URL`** in Vercel to `https://yourdomain.com` (or your chosen hostname) and redeploy.
+5. Set **`NEXT_PUBLIC_APP_URL`** in Vercel to `https://yourdomain.com` (or your chosen hostname) and redeploy. This ensures invitation email links use your custom domain.
+
+6. Set **`SESSION_COOKIE_DOMAIN`** to your apex domain (e.g. `scenemapper.ca`) so login persists across apex and www. Redeploy.
+
+**Cloudflare users:** See `docs/CUSTOM_DOMAIN_CLOUDFLARE_VERCEL.md` for step-by-step (use DNS only, not proxy).
 
 **You can skip Step 4** and keep using the free `*.vercel.app` URL; Resend and the app work fine with it.
 

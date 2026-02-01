@@ -49,6 +49,7 @@ export default function DashboardPage() {
         }
         const user = (data as { user?: User }).user;
         if (user) setCurrentUser({ ...user, password: '' });
+        navigate('/');
         return { ok: true as const };
       } catch {
         return { ok: false as const, error: 'Network error. Please try again.' };
@@ -71,6 +72,7 @@ export default function DashboardPage() {
     await saveUsers([...users, newUser]);
     await saveSession({ userId: newUser.id });
     setCurrentUser(newUser);
+    navigate('/');
     return { ok: true as const };
   };
 
@@ -109,6 +111,7 @@ export default function DashboardPage() {
 
     await saveSession({ userId: user.id });
     setCurrentUser(user);
+    navigate('/');
     return { ok: true as const };
   };
 

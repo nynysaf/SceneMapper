@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { NodeType, MapNode, MapTheme } from '../types';
-import { Filter, X, ExternalLink, Calendar, MapPin, User, Building, Leaf, Globe, Pencil, Trash2, Settings2, Link2, QrCode, Download } from 'lucide-react';
+import { X, ExternalLink, Calendar, MapPin, User, Building, Leaf, Globe, Pencil, Trash2, Settings2, Link2, QrCode, Download, Plus } from 'lucide-react';
 
 /** Squiggly/curved line icon for connection filter (20px, matches other filter icons). */
 function ConnectionLineIcon({ size = 20, className }: { size?: number; className?: string }) {
@@ -50,6 +50,8 @@ interface SidebarProps {
   onCollapsedChange?: (collapsed: boolean) => void;
   /** When set, shows Download in Share section; called with chosen format when user picks one. */
   onDownloadRequested?: (format: 'jpeg' | 'png' | 'pdf') => void;
+  /** Called when user clicks Plus to add a node; category is preset. Omit or falsy to hide Plus (e.g. public viewers). */
+  onAddNode?: (category: NodeType | 'CONNECTION') => void;
 }
 
 function Sidebar({
@@ -77,6 +79,7 @@ function Sidebar({
   onRegionFontScaleChange,
   onCollapsedChange,
   onDownloadRequested,
+  onAddNode,
 }: SidebarProps) {
   const categoryColors = mapTheme?.categoryColors;
   const [isCollapsed, setIsCollapsed] = React.useState(false);
@@ -121,23 +124,30 @@ function Sidebar({
   const connectionLineColor =
     mapTheme?.connectionLine?.color ?? mapTheme?.primaryColor ?? '#059669';
 
+  const handleWidth = 28;
   return (
-    <div className="fixed right-0 top-0 h-full z-50 flex items-stretch pointer-events-none">
+    <>
+      {/* Panel + Handle — whole thing slides; handle on left, stays visible when collapsed */}
       <div
-        className={`h-full flex flex-row pointer-events-auto transform transition-transform duration-300 ${
-          isCollapsed ? 'translate-x-full md:translate-x-80' : 'translate-x-0'
-        }`}
+        className="fixed top-0 right-0 h-full z-50 flex flex-row pointer-events-none"
       >
-        {/* drag/handle strip — inside panel so it moves with the sidebar */}
-        <button
-          type="button"
-          onClick={() => setIsCollapsed((v) => !v)}
-          className="hidden md:flex items-center justify-center px-1 shrink-0 pointer-events-auto self-center"
-          aria-label={isCollapsed ? 'Expand panel' : 'Collapse panel'}
+        <div
+          className={`h-full flex flex-row pointer-events-auto transform transition-transform duration-300 ${
+            isCollapsed ? 'translate-x-[calc(100%-28px)]' : 'translate-x-0'
+          }`}
+          style={{ width: 'min(90vw, 24rem)' }}
         >
-          <div className="w-1.5 h-16 rounded-full bg-emerald-200 hover:bg-emerald-300 transition-colors" />
-        </button>
-        <div className="h-full flex flex-col p-6 overflow-y-auto pt-24 md:pt-6 glass shadow-2xl w-[90vw] max-w-sm md:w-96">
+          {/* Handle — attached to left of panel, slides with it */}
+          <button
+            type="button"
+            onClick={() => setIsCollapsed((v) => !v)}
+            className="shrink-0 flex items-center justify-center w-7 bg-emerald-100/95 hover:bg-emerald-200 rounded-l-xl border-l border-t border-b border-emerald-200/80 self-stretch"
+            style={{ width: handleWidth }}
+            aria-label={isCollapsed ? 'Expand panel' : 'Collapse panel'}
+          >
+            <div className="w-1.5 h-12 rounded-full bg-emerald-500" />
+          </button>
+          <div className="h-full flex flex-col p-6 overflow-y-auto pt-24 md:pt-6 glass shadow-2xl flex-1 w-[90vw] max-w-sm md:w-80">
         {selectedNode ? (
           <div className="flex flex-col gap-4 relative">
             {userRole === 'admin' && onEditMapSettings && !isNodePopupOpen && (
@@ -239,12 +249,8 @@ function Sidebar({
           </div>
         ) : (
           <div className="space-y-8">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-2xl font-bold text-emerald-950 flex items-center gap-2">
-                <Filter size={24} className="text-emerald-600" />
-                Filter
-              </h2>
-              {userRole === 'admin' && onEditMapSettings && !isNodePopupOpen && (
+            {userRole === 'admin' && onEditMapSettings && !isNodePopupOpen && (
+              <div className="flex justify-end">
                 <button
                   type="button"
                   onClick={onEditMapSettings}
@@ -253,58 +259,95 @@ function Sidebar({
                 >
                   <Settings2 size={20} />
                 </button>
-              )}
-            </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 gap-3">
-              {filterOptions.map(({ type, label, icon: Icon }) => (
-                <button
-                  key={type}
-                  onClick={() => onToggleFilter(type)}
-                  className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${
-                    activeFilters.includes(type) 
-                      ? 'bg-white border-emerald-400 solarpunk-shadow scale-[1.02]' 
-                      : 'bg-emerald-50/50 border-transparent opacity-60 grayscale'
-                  }`}
-                >
-                  <div className="flex items-center gap-4">
-                    <div 
-                      className="w-10 h-10 rounded-xl flex items-center justify-center text-white"
-                      style={{
-                        backgroundColor: categoryColors?.[type] ?? '#059669',
-                      }}
+              {filterOptions.map(({ type, label, icon: Icon }) => {
+                const isActive = activeFilters.includes(type);
+                return (
+                  <div
+                    key={type}
+                    className={`flex items-stretch gap-0 rounded-2xl border-2 transition-all overflow-hidden ${
+                      isActive ? 'bg-white border-emerald-400 solarpunk-shadow' : 'bg-emerald-50/50 border-transparent opacity-60 grayscale'
+                    }`}
+                  >
+                    {onAddNode && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); onAddNode(type); }}
+                        className={`shrink-0 w-10 flex items-center justify-center rounded-l-xl transition-opacity self-stretch ${
+                          isActive ? 'bg-emerald-500 hover:bg-emerald-600 text-white opacity-100' : 'bg-emerald-400/50 text-white/80 opacity-60'
+                        }`}
+                        title={`Add ${label.toLowerCase()}`}
+                      >
+                        <Plus size={18} />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => onToggleFilter(type)}
+                      className="flex-1 flex items-center gap-3 p-3 min-w-0 text-left"
+                      title={isActive ? 'Hide from map' : 'Show on map'}
                     >
-                      <Icon size={20} />
-                    </div>
-                    <span className="font-bold text-emerald-900">{label}</span>
+                      <div
+                        className="w-9 h-9 rounded-lg flex items-center justify-center text-white shrink-0"
+                        style={{ backgroundColor: categoryColors?.[type] ?? '#059669' }}
+                      >
+                        <Icon size={18} />
+                      </div>
+                      <span className="font-bold text-emerald-900 truncate flex-1">{label}</span>
+                      <div
+                        className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 ${
+                          isActive ? 'border-emerald-500 bg-emerald-500' : 'border-emerald-200'
+                        }`}
+                      >
+                        {isActive && <div className="w-1.5 h-1.5 bg-white rounded-sm" />}
+                      </div>
+                    </button>
                   </div>
-                  <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${activeFilters.includes(type) ? 'border-emerald-500 bg-emerald-500' : 'border-emerald-200'}`}>
-                    {activeFilters.includes(type) && <div className="w-2 h-2 bg-white rounded-full" />}
-                  </div>
-                </button>
-              ))}
+                );
+              })}
               {connectionsEnabled && (
-                <button
-                  onClick={onConnectionsFilterToggle}
-                  className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${
-                    connectionsFilterOn
-                      ? 'bg-white border-emerald-400 solarpunk-shadow scale-[1.02]'
-                      : 'bg-emerald-50/50 border-transparent opacity-60 grayscale'
+                <div
+                  className={`flex items-stretch gap-0 rounded-2xl border-2 transition-all overflow-hidden ${
+                    connectionsFilterOn ? 'bg-white border-emerald-400 solarpunk-shadow' : 'bg-emerald-50/50 border-transparent opacity-60 grayscale'
                   }`}
                 >
-                  <div className="flex items-center gap-4">
+                  {onAddNode && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); onAddNode('CONNECTION'); }}
+                      className={`shrink-0 w-10 min-h-[3.5rem] flex items-center justify-center rounded-l-xl transition-opacity self-stretch ${
+                        connectionsFilterOn ? 'bg-emerald-500 hover:bg-emerald-600 text-white opacity-100' : 'bg-emerald-400/50 text-white/80 opacity-60'
+                      }`}
+                      title="Add connection"
+                    >
+                      <Plus size={18} />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={onConnectionsFilterToggle}
+                    className="flex-1 flex items-center gap-3 p-3 min-w-0 text-left"
+                    title={connectionsFilterOn ? 'Hide connections' : 'Show connections'}
+                  >
                     <div
-                      className="w-10 h-10 rounded-xl flex items-center justify-center text-white"
+                      className="w-9 h-9 rounded-lg flex items-center justify-center text-white shrink-0"
                       style={{ backgroundColor: connectionLineColor }}
                     >
-                      <ConnectionLineIcon size={20} className="text-white" />
+                      <ConnectionLineIcon size={18} className="text-white" />
                     </div>
-                    <span className="font-bold text-emerald-900">Connections</span>
-                  </div>
-                  <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${connectionsFilterOn ? 'border-emerald-500 bg-emerald-500' : 'border-emerald-200'}`}>
-                    {connectionsFilterOn && <div className="w-2 h-2 bg-white rounded-full" />}
-                  </div>
-                </button>
+                    <span className="font-bold text-emerald-900 truncate flex-1">Connections</span>
+                    <div
+                      className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 ${
+                        connectionsFilterOn ? 'border-emerald-500 bg-emerald-500' : 'border-emerald-200'
+                      }`}
+                    >
+                      {connectionsFilterOn && <div className="w-1.5 h-1.5 bg-white rounded-sm" />}
+                    </div>
+                  </button>
+                </div>
               )}
             </div>
 
@@ -416,10 +459,11 @@ function Sidebar({
             </div>
           </div>
         )}
+        </div>
       </div>
-    </div>
+      </div>
 
-    {showQR && shareUrl && (
+      {showQR && shareUrl && (
       <div
         className="fixed inset-0 z-[70] flex items-center justify-center bg-emerald-950/40 backdrop-blur-sm pointer-events-auto"
         onClick={() => setShowQR(false)}
@@ -443,9 +487,9 @@ function Sidebar({
           </button>
         </div>
       </div>
-    )}
+      )}
 
-    {showDownloadModal && onDownloadRequested && (
+      {showDownloadModal && onDownloadRequested && (
       <div
         className="fixed inset-0 z-[70] flex items-center justify-center bg-emerald-950/40 backdrop-blur-sm pointer-events-auto"
         onClick={() => setShowDownloadModal(false)}
@@ -496,8 +540,8 @@ function Sidebar({
           </button>
         </div>
       </div>
-    )}
-  </div>
+      )}
+    </>
   );
 }
 

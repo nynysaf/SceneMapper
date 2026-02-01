@@ -25,7 +25,9 @@ SceneMapper is an interactive, crowd-sourced map application for building "scene
 - `SubmissionModal.tsx`: A user-friendly form with a follow-up spatial placement step on the map.
 
 ## Recent session progress (to pick up)
-- **Create/Edit map screens:** Title "Map your scene, your way." (create) / "Edit your map" (edit). Body copy: "Build your map to inspire your scene..." with bold **name**, **Describe**, **background image** bullets. Left column has "YOUR MAPS" section (only when user has maps). Solarpunk Emerald theme description: "Bright greens, warm neutrals – like nature on M" (no Torontopia mention).
+- **Dashboard create/edit (Jan 31):** Region font and colour in Themes; layout/spacing fixes (separator, Connection lines, divider); increased font sizes; Create Map button in Your Maps. See `docs/SESSION_SUMMARY.md`.
+- **Speed optimizations (done):** Tier 1–4 complete. Map page uses combined API, parallel fetch, single load effect. See `docs/SPEED_AND_EFFICIENCY_PLAN.md` and `docs/DATA_FLOW.md`.
+- **Custom domain:** scenemapper.ca live. Session cookie shared across apex/www (12 months). Invitation emails use custom domain links. See `docs/SESSION_SUMMARY.md` for env vars and `docs/CUSTOM_DOMAIN_CLOUDFLARE_VERCEL.md` for setup.
 
 ## Version control & deployment
 - **Git:** Repo on GitHub; **Vercel** for hosting; **Supabase** for DB. See **`docs/DEPLOYMENT_SEQUENCE.md`** for the full sequence. **Resend** is used for invitation emails when admins/collaborators add emails and save the map.
@@ -36,7 +38,7 @@ SceneMapper is an interactive, crowd-sourced map application for building "scene
 2. **Multimedia Support:** Add image upload fields for nodes to create a richer visual experience.
 3. **Mobile Polish:** While responsive, the D3 zoom/pan could be further optimized for multi-touch gestures.
 4. **Real-time Updates:** Implement WebSockets or similar to allow users to see others adding nodes in real-time.
-5. **Custom Domain:** Add your own domain in Vercel when ready; Resend can then use a verified from-address (e.g. `invitations@yourdomain.com`).
+5. ~~**Custom Domain:**~~ Done. scenemapper.ca connected; Resend uses verified domain for invitations.
 
 ## Design Aesthetic
 - **Solarpunk Theme:** Uses a palette of emerald greens, amber golds, and sky blues. 

@@ -92,6 +92,10 @@ export async function POST(request: NextRequest) {
 
     // Send invitation emails to newly added addresses (only when Resend is configured)
     const fromEmail = process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev';
+    const hasResendKey = !!process.env.RESEND_API_KEY;
+    if (!hasResendKey) {
+      console.warn('POST /api/maps: RESEND_API_KEY not set; skipping invitation emails');
+    }
     for (const m of maps) {
       const mapId = ensureUuid(m.id);
       const prev = existingById[mapId] ?? { invitedAdminEmails: [], invitedCollaboratorEmails: [] };
@@ -99,6 +103,16 @@ export async function POST(request: NextRequest) {
       const currentCollaborators = normalizeEmails(m.invitedCollaboratorEmails);
       const newAdminEmails = currentAdmins.filter((e) => !prev.invitedAdminEmails.includes(e));
       const newCollaboratorEmails = currentCollaborators.filter((e) => !prev.invitedCollaboratorEmails.includes(e));
+
+      if (newAdminEmails.length > 0 || newCollaboratorEmails.length > 0) {
+        console.log('POST /api/maps: invitation emails to send', {
+          mapSlug: m.slug,
+          newAdmins: newAdminEmails.length,
+          newCollaborators: newCollaboratorEmails.length,
+          hasResendKey,
+        });
+      }
+      if (!hasResendKey) continue;
 
       for (const to of newAdminEmails) {
         const result = await sendInvitationEmail({
@@ -109,6 +123,8 @@ export async function POST(request: NextRequest) {
         });
         if ('error' in result) {
           console.error('Invitation email (admin)', to, result.error);
+        } else {
+          console.log('Invitation email sent (admin)', to);
         }
       }
       for (const to of newCollaboratorEmails) {
@@ -120,6 +136,8 @@ export async function POST(request: NextRequest) {
         });
         if ('error' in result) {
           console.error('Invitation email (collaborator)', to, result.error);
+        } else {
+          console.log('Invitation email sent (collaborator)', to);
         }
       }
     }

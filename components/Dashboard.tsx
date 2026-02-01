@@ -8,7 +8,7 @@ import {
   DEFAULT_COLLABORATOR_SUBJECT,
   DEFAULT_COLLABORATOR_BODY,
 } from '../lib/invitation-email';
-import { Trash2, Link2, QrCode, Pencil, X } from 'lucide-react';
+import { Trash2, Link2, QrCode, Pencil, X, Plus } from 'lucide-react';
 
 interface DashboardProps {
   onNavigate: (path: string) => void;
@@ -170,6 +170,12 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [customCommunityColor, setCustomCommunityColor] = useState<string>(
     DEFAULT_THEME.theme.categoryColors?.[NodeType.COMMUNITY] || '#3498DB',
   );
+  const [customRegionColor, setCustomRegionColor] = useState<string>(
+    DEFAULT_THEME.theme.categoryColors?.[NodeType.REGION] || '#4a5568',
+  );
+  const [customRegionFont, setCustomRegionFont] = useState<string>(
+    DEFAULT_THEME.theme.regionFont || '',
+  );
   const [customConnectionLineColor, setCustomConnectionLineColor] = useState<string>(
     DEFAULT_THEME.theme.connectionLine?.color ?? DEFAULT_THEME.theme.primaryColor,
   );
@@ -285,7 +291,9 @@ const Dashboard: React.FC<DashboardProps> = ({
       setCustomPersonColor(themeToUse.categoryColors[NodeType.PERSON] || customPersonColor);
       setCustomSpaceColor(themeToUse.categoryColors[NodeType.SPACE] || customSpaceColor);
       setCustomCommunityColor(themeToUse.categoryColors[NodeType.COMMUNITY] || customCommunityColor);
+      setCustomRegionColor(themeToUse.categoryColors[NodeType.REGION] || customRegionColor);
     }
+    setCustomRegionFont(themeToUse.regionFont ?? '');
     if (themeToUse.connectionLine) {
       setCustomConnectionLineColor(themeToUse.connectionLine.color);
       setCustomConnectionLineOpacity(themeToUse.connectionLine.opacity);
@@ -398,8 +406,9 @@ const Dashboard: React.FC<DashboardProps> = ({
         [NodeType.PERSON]: customPersonColor,
         [NodeType.SPACE]: customSpaceColor,
         [NodeType.COMMUNITY]: customCommunityColor,
-        [NodeType.REGION]: selectedPreset.theme.categoryColors?.[NodeType.REGION] ?? '#4a5568',
+        [NodeType.REGION]: customRegionColor,
       },
+      regionFont: customRegionFont || undefined,
       connectionLine: {
         color: customConnectionLineColor,
         opacity: customConnectionLineOpacity,
@@ -593,26 +602,18 @@ const Dashboard: React.FC<DashboardProps> = ({
               </ul>
             </div>
           )}
-          <p className="mt-3">
-            <a
-              href="/dashboard/import"
-              className="text-[11px] text-emerald-600 hover:text-emerald-800 underline"
-            >
-              Import from browser storage →
-            </a>
-          </p>
 
           <div className="glass rounded-3xl p-6 solarpunk-shadow mt-6">
             {currentUser ? (
               <>
                 {/* Create / Edit map form */}
                 <div className="mt-3">
-                  <h4 className="text-xs font-semibold text-emerald-900 uppercase tracking-wide mb-2">
+                  <h4 className="text-sm font-semibold text-emerald-900 uppercase tracking-wide mb-2">
                     {editingMapId ? 'Edit map' : 'Create a new map'}
                   </h4>
                   <form onSubmit={handleCreateMap} className="space-y-2">
                     <div className="space-y-1">
-                      <label className="text-[11px] font-semibold text-emerald-900">
+                      <label className="text-sm font-semibold text-emerald-900">
                         Title
                       </label>
                       <input
@@ -624,9 +625,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[11px] font-semibold text-emerald-900">
+                      <label className="text-sm font-semibold text-emerald-900">
                         URL slug
-                        <span className="ml-1 text-[10px] font-normal text-emerald-700">
+                        <span className="ml-1 text-xs font-normal text-emerald-700">
                           (optional)
                         </span>
                       </label>
@@ -637,14 +638,14 @@ const Dashboard: React.FC<DashboardProps> = ({
                         value={mapSlug}
                         onChange={(e) => setMapSlug(e.target.value)}
                       />
-                      <p className="text-[10px] text-emerald-700">
+                      <p className="text-xs text-emerald-700">
                         Your map will live at <span className="font-mono">/maps/{mapSlug || (mapTitle ? slugify(mapTitle) : 'your-slug')}</span>.
                       </p>
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[11px] font-semibold text-emerald-900">
+                      <label className="text-sm font-semibold text-emerald-900">
                         Description
-                        <span className="ml-1 text-[10px] font-normal text-emerald-700">
+                        <span className="ml-1 text-xs font-normal text-emerald-700">
                           (optional)
                         </span>
                       </label>
@@ -655,40 +656,40 @@ const Dashboard: React.FC<DashboardProps> = ({
                         value={mapDescription}
                         onChange={(e) => setMapDescription(e.target.value)}
                       />
-                      <p className="text-[10px] text-emerald-600 text-right">
+                      <p className="text-xs text-emerald-600 text-right">
                         {mapDescription.length}/1200
                       </p>
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[11px] font-semibold text-emerald-900">
+                      <label className="text-sm font-semibold text-emerald-900">
                         Background map image
                       </label>
                       <input
                         type="file"
                         accept="image/png,image/jpeg,image/webp"
-                        className="block w-full text-[11px] text-emerald-800 file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700"
+                        className="block w-full text-sm text-emerald-800 file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700"
                         onChange={(e) => {
                           const file = e.target.files?.[0] || null;
                           setBackgroundFile(file);
                           setBackgroundError(null);
                         }}
                       />
-                      <p className="text-[10px] text-emerald-700">
+                      <p className="text-xs text-emerald-700">
                         PNG, JPG, or WebP · up to 5MB · recommended between 1600×900 and 4000×4000
                         pixels.
                       </p>
                       {backgroundError && (
-                        <p className="text-[11px] text-rose-600 bg-rose-50 border border-rose-100 rounded-xl px-3 py-2">
+                        <p className="text-sm text-rose-600 bg-rose-50 border border-rose-100 rounded-xl px-3 py-2">
                           {backgroundError}
                         </p>
                       )}
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[11px] font-semibold text-emerald-900">
+                      <label className="text-sm font-semibold text-emerald-900">
                         Theme
                       </label>
                       <select
-                        className="w-full bg-white/70 border border-emerald-100 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-emerald-400"
+                        className="w-full bg-white/70 border border-emerald-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-400"
                         value={selectedThemeId}
                         onChange={(e) => {
                           const id = e.target.value;
@@ -703,7 +704,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                             setCustomCommunityColor(
                               cat[NodeType.COMMUNITY] || customCommunityColor,
                             );
+                            setCustomRegionColor(cat[NodeType.REGION] || customRegionColor);
                           }
+                          setCustomRegionFont(preset.theme.regionFont ?? '');
                           const conn = preset.theme.connectionLine;
                           if (conn) {
                             setCustomConnectionLineColor(conn.color);
@@ -718,15 +721,15 @@ const Dashboard: React.FC<DashboardProps> = ({
                           </option>
                         ))}
                       </select>
-                      <p className="text-[10px] text-emerald-700">
+                      <p className="text-xs text-emerald-700">
                         {selectedThemeId === baseThemeId
                           ? THEME_PRESETS.find((preset) => preset.id === selectedThemeId)
                               ?.description
                           : 'Custom palette based on your selected theme.'}
                       </p>
-                      <div className="mt-2 grid grid-cols-2 gap-3">
+                      <div className="mt-2 grid grid-cols-2 gap-3 pb-4">
                         <div className="space-y-1">
-                          <label className="text-[10px] font-semibold text-emerald-900">
+                          <label className="text-xs font-semibold text-emerald-900">
                             Event color
                           </label>
                           <input
@@ -742,7 +745,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                           />
                         </div>
                         <div className="space-y-1">
-                          <label className="text-[10px] font-semibold text-emerald-900">
+                          <label className="text-xs font-semibold text-emerald-900">
                             Person color
                           </label>
                           <input
@@ -758,7 +761,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                           />
                         </div>
                         <div className="space-y-1">
-                          <label className="text-[10px] font-semibold text-emerald-900">
+                          <label className="text-xs font-semibold text-emerald-900">
                             Space color
                           </label>
                           <input
@@ -789,9 +792,47 @@ const Dashboard: React.FC<DashboardProps> = ({
                             }}
                           />
                         </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-emerald-900">
+                            Region colour
+                          </label>
+                          <input
+                            type="color"
+                            className="h-8 w-full rounded-md border border-emerald-100 bg-white/70"
+                            value={customRegionColor}
+                            onChange={(e) => {
+                              setCustomRegionColor(e.target.value);
+                              if (selectedThemeId === baseThemeId) {
+                                setSelectedThemeId('custom');
+                              }
+                            }}
+                          />
+                        </div>
+                        <div className="space-y-1 col-span-2">
+                          <label className="text-[10px] font-semibold text-emerald-900">
+                            Region font
+                          </label>
+                          <select
+                            className="w-full h-8 rounded-md border border-emerald-100 bg-white/70 text-sm text-emerald-900"
+                            value={customRegionFont}
+                            onChange={(e) => {
+                              setCustomRegionFont(e.target.value);
+                              if (selectedThemeId === baseThemeId) {
+                                setSelectedThemeId('custom');
+                              }
+                            }}
+                          >
+                            <option value="">Default (Georgia, serif)</option>
+                            <option value="Georgia, serif">Georgia</option>
+                            <option value="'Playfair Display', serif">Playfair Display</option>
+                            <option value="'Outfit', sans-serif">Outfit</option>
+                            <option value="'Inter', sans-serif">Inter</option>
+                            <option value="system-ui, sans-serif">System UI</option>
+                          </select>
+                        </div>
                       </div>
-                      <div className="mt-3 pt-3 border-t border-emerald-100 space-y-2">
-                        <label className="text-[10px] font-semibold text-emerald-900 block">
+                      <div className="space-y-2">
+                        <label className="text-xs font-semibold text-emerald-900 block">
                           Connection lines
                         </label>
                         <div className="grid grid-cols-2 gap-3">
@@ -810,7 +851,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                             />
                           </div>
                           <div className="space-y-1">
-                            <label className="text-[10px] font-semibold text-emerald-900">
+                            <label className="text-xs font-semibold text-emerald-900">
                               Opacity
                             </label>
                             <input
@@ -830,7 +871,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                             </span>
                           </div>
                           <div className="space-y-1 col-span-2">
-                            <label className="text-[10px] font-semibold text-emerald-900">
+                            <label className="text-xs font-semibold text-emerald-900">
                               Thickness (px)
                             </label>
                             <input
@@ -851,11 +892,11 @@ const Dashboard: React.FC<DashboardProps> = ({
                         </div>
                       </div>
                     </div>
-                    <div className="space-y-2">
-                      <label className="text-[11px] font-semibold text-emerald-900 block">
+                    <div className="space-y-2 pb-4">
+                      <label className="text-sm font-semibold text-emerald-900 block">
                         Show on map
                       </label>
-                      <p className="text-[10px] text-emerald-700">
+                      <p className="text-xs text-emerald-700">
                         Disabled types are hidden from the map, filter panel, and add-entry options.
                       </p>
                       <div className="flex flex-wrap gap-4">
@@ -890,10 +931,10 @@ const Dashboard: React.FC<DashboardProps> = ({
                         </label>
                       </div>
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-semibold text-emerald-900">
+                    <div className="pt-3 border-t border-emerald-100 space-y-1">
+                      <label className="text-sm font-semibold text-emerald-900">
                         Collaborator password
-                        <span className="ml-1 text-[10px] font-normal text-emerald-700">
+                        <span className="ml-1 text-xs font-normal text-emerald-700">
                           (optional)
                         </span>
                       </label>
@@ -904,39 +945,39 @@ const Dashboard: React.FC<DashboardProps> = ({
                         value={collaboratorPassword}
                         onChange={(e) => setCollaboratorPassword(e.target.value)}
                       />
-                      <p className="text-[10px] text-emerald-700">
+                      <p className="text-xs text-emerald-700">
                         People with this password will be able to join this map as collaborators in
                         a future step.
                       </p>
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[11px] font-semibold text-emerald-900">
+                      <label className="text-sm font-semibold text-emerald-900">
                         Invite admins by email
-                        <span className="ml-1 text-[10px] font-normal text-emerald-700">
+                        <span className="ml-1 text-xs font-normal text-emerald-700">
                           (comma-separated, optional)
                         </span>
                       </label>
                       <textarea
-                        className="w-full bg-white/70 border border-emerald-100 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-emerald-400 resize-none h-12"
+                        className="w-full bg-white/70 border border-emerald-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-400 resize-none h-12"
                         placeholder="warden@example.org, steward@example.org"
                         value={invitedAdmins}
                         onChange={(e) => setInvitedAdmins(e.target.value)}
                       />
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-semibold text-emerald-900">
+                    <div className="space-y-1 pb-4">
+                      <label className="text-sm font-semibold text-emerald-900">
                         Invite collaborators by email
-                        <span className="ml-1 text-[10px] font-normal text-emerald-700">
+                        <span className="ml-1 text-xs font-normal text-emerald-700">
                           (comma-separated, optional)
                         </span>
                       </label>
                       <textarea
-                        className="w-full bg-white/70 border border-emerald-100 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-emerald-400 resize-none h-12"
+                        className="w-full bg-white/70 border border-emerald-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-400 resize-none h-12"
                         placeholder="friend1@example.org, friend2@example.org"
                         value={invitedCollaborators}
                         onChange={(e) => setInvitedCollaborators(e.target.value)}
                       />
-                      <p className="text-[10px] text-emerald-700">
+                      <p className="text-xs text-emerald-700">
                         <button
                           type="button"
                           onClick={() => setShowInvitationEmailModal(true)}
@@ -1064,7 +1105,7 @@ const Dashboard: React.FC<DashboardProps> = ({
           {currentUser && maps.length > 0 && (
             <div className="glass rounded-3xl p-6 solarpunk-shadow">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-xs font-semibold text-emerald-900 uppercase tracking-wide">
+                <h3 className="text-sm font-semibold text-emerald-900 uppercase tracking-wide">
                   Your maps
                 </h3>
                 <button
@@ -1119,7 +1160,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                             setCustomPersonColor(theme.categoryColors[NodeType.PERSON] ?? customPersonColor);
                             setCustomSpaceColor(theme.categoryColors[NodeType.SPACE] ?? customSpaceColor);
                             setCustomCommunityColor(theme.categoryColors[NodeType.COMMUNITY] ?? customCommunityColor);
+                            setCustomRegionColor(theme.categoryColors[NodeType.REGION] ?? customRegionColor);
                           }
+                          setCustomRegionFont(theme.regionFont ?? '');
                           if (theme.connectionLine) {
                             setCustomConnectionLineColor(theme.connectionLine.color);
                             setCustomConnectionLineOpacity(theme.connectionLine.opacity);
@@ -1165,6 +1208,49 @@ const Dashboard: React.FC<DashboardProps> = ({
                   </li>
                 ))}
               </ul>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingMapId(null);
+                  setEditingOriginalSlug(null);
+                  setMapTitle('');
+                  setMapSlug('');
+                  setMapDescription('');
+                  setSelectedThemeId(DEFAULT_THEME.id);
+                  setBaseThemeId(DEFAULT_THEME.id);
+                  const t = DEFAULT_THEME.theme;
+                  if (t.categoryColors) {
+                    setCustomEventColor(t.categoryColors[NodeType.EVENT] ?? customEventColor);
+                    setCustomPersonColor(t.categoryColors[NodeType.PERSON] ?? customPersonColor);
+                    setCustomSpaceColor(t.categoryColors[NodeType.SPACE] ?? customSpaceColor);
+                    setCustomCommunityColor(t.categoryColors[NodeType.COMMUNITY] ?? customCommunityColor);
+                    setCustomRegionColor(t.categoryColors[NodeType.REGION] ?? customRegionColor);
+                  }
+                  setCustomRegionFont(t.regionFont ?? '');
+                  if (t.connectionLine) {
+                    setCustomConnectionLineColor(t.connectionLine.color);
+                    setCustomConnectionLineOpacity(t.connectionLine.opacity);
+                    setCustomConnectionLineThickness(t.connectionLine.thickness);
+                  }
+                  setCollaboratorPassword('');
+                  setInvitedAdmins('');
+                  setInvitedCollaborators('');
+                  setInvitationEmailSubjectAdmin('');
+                  setInvitationEmailBodyAdmin('');
+                  setInvitationEmailSubjectCollaborator('');
+                  setInvitationEmailBodyCollaborator('');
+                  setInvitationSenderName('');
+                  setBackgroundFile(null);
+                  setBackgroundError(null);
+                  setMapError(null);
+                  setEnabledNodeTypes(Object.values(NodeType));
+                  setConnectionsEnabled(true);
+                }}
+                className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed border-emerald-200 text-emerald-700 font-semibold text-sm hover:bg-emerald-50 hover:border-emerald-300 transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                Create map
+              </button>
             </div>
           )}
         </section>

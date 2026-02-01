@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import Link from 'next/link';
 import { MapNode, MapConnection, NodeType, UserSession, MapTheme, SceneMap, User, AuthSession } from '../types';
 import { INITIAL_NODES, CATEGORY_COLORS } from '../constants';
 import { getNodes as loadNodes, saveNodes as persistNodes, getConnections as loadConnections, saveConnections as persistConnections, getUsers, getSession, getMaps, saveMaps, isAbortError } from '../lib/data';
@@ -94,6 +95,7 @@ const MapExperience: React.FC<MapExperienceProps> = ({
   const [activeFilters, setActiveFilters] = useState<NodeType[]>(Object.values(NodeType));
   const [connectionsFilterOn, setConnectionsFilterOn] = useState(true);
   const [isSubmissionOpen, setIsSubmissionOpen] = useState(false);
+  const [submissionPresetKind, setSubmissionPresetKind] = useState<NodeType | 'CONNECTION' | null>(null);
   const [isAdminReviewOpen, setIsAdminReviewOpen] = useState(false);
   const [pendingNode, setPendingNode] = useState<Partial<MapNode> | null>(null);
   const [selectedNode, setSelectedNode] = useState<MapNode | null>(null);
@@ -296,6 +298,7 @@ const MapExperience: React.FC<MapExperienceProps> = ({
   const startPlacement = (nodeData: Partial<MapNode>) => {
     setPendingNode(nodeData);
     setIsSubmissionOpen(false);
+    setSubmissionPresetKind(null);
     setSelectedNode(null);
     setPopupAnchor(null);
   };
@@ -647,14 +650,19 @@ const MapExperience: React.FC<MapExperienceProps> = ({
         <div className="pointer-events-auto flex items-center gap-4">
           <div className="glass p-3 rounded-2xl solarpunk-shadow flex items-center gap-3">
             <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center text-white"
+              className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-sm shrink-0"
               style={{ backgroundColor: mapTheme?.primaryColor ?? '#059669' }}
             >
-              <Users size={24} />
+              {mapTitle.split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase().slice(0, 2) || '?'}
             </div>
             <div>
               <h1 className="text-xl font-bold text-emerald-900 leading-tight">{mapTitle}</h1>
-              <p className="text-xs text-emerald-700 font-medium">{mapSubtitle}</p>
+              <Link
+                href="/"
+                className="text-xs text-emerald-700 font-medium hover:text-emerald-900 hover:underline"
+              >
+                {mapSubtitle}
+              </Link>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -811,6 +819,7 @@ const MapExperience: React.FC<MapExperienceProps> = ({
             nodeSizeScale={nodeSizeScale}
             nodeLabelFontScale={nodeLabelFontScale}
             regionFontScale={regionFontScale}
+            regionFontFamily={mapTheme?.regionFont}
             connections={connectionsEnabled ? connections : []}
             connectionLineStyle={
               mapTheme?.connectionLine ??
@@ -846,6 +855,7 @@ const MapExperience: React.FC<MapExperienceProps> = ({
           nodeSizeScale={nodeSizeScale}
           nodeLabelFontScale={nodeLabelFontScale}
           regionFontScale={regionFontScale}
+          regionFontFamily={mapTheme?.regionFont}
           connections={
             connectionsEnabled && connectionsFilterOn ? connections : []
           }
@@ -898,7 +908,10 @@ const MapExperience: React.FC<MapExperienceProps> = ({
             </button>
           )}
           <button
-            onClick={() => setIsSubmissionOpen(true)}
+            onClick={() => {
+              setSubmissionPresetKind(null);
+              setIsSubmissionOpen(true);
+            }}
             className="bg-emerald-600 text-white w-16 h-16 rounded-full solarpunk-shadow flex items-center justify-center hover:bg-emerald-700 hover:scale-110 active:scale-95 transition-all"
             title="Add to Map"
           >
@@ -946,12 +959,20 @@ const MapExperience: React.FC<MapExperienceProps> = ({
         }
         onCollapsedChange={setSidebarCollapsed}
         onDownloadRequested={mapSlug ? handleDownloadRequested : undefined}
+        onAddNode={(category) => {
+          setSubmissionPresetKind(category);
+          setIsSubmissionOpen(true);
+        }}
       />
 
       {/* Modals */}
       {isSubmissionOpen && (
         <SubmissionModal
-          onClose={() => setIsSubmissionOpen(false)}
+          onClose={() => {
+            setIsSubmissionOpen(false);
+            setSubmissionPresetKind(null);
+          }}
+          presetKind={submissionPresetKind}
           onSubmit={startPlacement}
           onSubmitConnection={handleSubmitConnection}
           userRole={userSession.role}

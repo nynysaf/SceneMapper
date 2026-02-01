@@ -1,35 +1,37 @@
 import React, { useState } from 'react';
-import type { User } from '../types';
+import type { User, SceneMap } from '../types';
 
-/** Example map entry for the landing page. Add thumbnailUrl when you have a link. */
-export interface ExampleMapEntry {
-  title: string;
-  /** Path or full URL to open when the thumbnail is clicked */
-  href: string;
-  /** Optional thumbnail image URL. Omit for placeholder until you provide a link. */
-  thumbnailUrl?: string;
-  /** Optional short description */
-  description?: string;
+/**
+ * Featured map links. Add map URLs here to feature them on the home page.
+ * Links open in public view; users with access see collaborator/admin features when logged in.
+ * Format: /maps/slug or https://scenemapper.ca/maps/slug
+ */
+export const FEATURED_MAP_HREFS: string[] = [
+  '/maps/torontopia',
+  // Add more when you have links, e.g.: '/maps/another-map',
+];
+
+export function slugFromHref(href: string): string {
+  const match = href.match(/\/maps\/([^/?#]+)/);
+  return match ? match[1] : href;
 }
 
-/** Populate this list when you have map links/thumbnails. */
-const EXAMPLE_MAPS: ExampleMapEntry[] = [
-  {
-    title: 'Torontopia: Solarpunk Commons',
-    href: '/maps/torontopia',
-    description:
-      'An interactive, crowd-sourced map of solarpunk communities, events, spaces, and people in Toronto.',
-  },
-  // Add more entries when you have links, e.g.:
-  // { title: 'Your Map', href: '/maps/your-slug', thumbnailUrl: 'https://...', description: '...' },
-];
+function roleForMap(map: SceneMap, user: User | null): 'Admin' | 'Collaborator' | 'Viewed' {
+  if (!user) return 'Viewed';
+  if (map.adminIds?.includes(user.id)) return 'Admin';
+  if (map.collaboratorIds?.includes(user.id)) return 'Collaborator';
+  return 'Viewed';
+}
 
 interface LandingPageProps {
   onNavigate: (path: string) => void;
   currentUser: User | null;
+  userMaps?: SceneMap[];
+  /** Maps to feature on the landing page; filtered by FEATURED_MAP_HREFS slugs. */
+  featuredMaps?: SceneMap[];
 }
 
-const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, currentUser }) => {
+const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, currentUser, userMaps = [], featuredMaps = [] }) => {
   const [logoError, setLogoError] = useState(false);
 
   const handleExampleHref = (href: string) => {
@@ -65,17 +67,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, currentUser }) =>
         </div>
         <div className="flex items-center gap-3">
           {currentUser ? (
-            <>
-              <span className="hidden md:inline text-xs text-emerald-800">
-                Signed in as <span className="font-semibold">{currentUser.email}</span>
-              </span>
-              <button
-                onClick={() => onNavigate('/dashboard')}
-                className="text-sm font-semibold text-emerald-800 px-3 py-2 rounded-xl hover:bg-emerald-50 transition-colors"
-              >
-                Go to dashboard
-              </button>
-            </>
+            <span className="hidden md:inline text-xs text-emerald-800">
+              Signed in as <span className="font-semibold">{currentUser.email}</span>
+            </span>
           ) : (
             <button
               onClick={() => onNavigate('/dashboard')}
@@ -116,43 +110,118 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, currentUser }) =>
           </p>
         </section>
 
-        <section className="flex-1 w-full max-w-md">
-          <div className="glass rounded-[2.5rem] p-6 md:p-8 solarpunk-shadow relative overflow-hidden">
-            <div className="absolute -right-10 -top-10 w-40 h-40 bg-emerald-200 rounded-full opacity-40" />
-            <div className="absolute -left-12 bottom-0 w-52 h-52 bg-sky-200 rounded-full opacity-40" />
+        <section className="flex-1 w-full max-w-md space-y-6">
+          {currentUser && (
+            <div className="glass rounded-[2.5rem] p-6 md:p-8 solarpunk-shadow relative overflow-hidden">
+              <div className="absolute -right-10 -top-10 w-40 h-40 bg-emerald-200 rounded-full opacity-40" />
+              <div className="absolute -left-12 bottom-0 w-52 h-52 bg-sky-200 rounded-full opacity-40" />
+              <div className="relative space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-bold text-emerald-950">Your maps</h3>
+                  <button
+                    onClick={() => onNavigate('/dashboard')}
+                    className="text-xs font-semibold text-emerald-700 hover:text-emerald-900 hover:underline"
+                  >
+                    Create map
+                  </button>
+                </div>
+                {userMaps.length === 0 ? (
+                  <p className="text-sm text-emerald-700">
+                    You haven&apos;t created any maps yet.{' '}
+                    <button
+                      onClick={() => onNavigate('/dashboard')}
+                      className="font-semibold text-emerald-800 hover:underline"
+                    >
+                      Create your first map
+                    </button>
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {[...userMaps]
+                      .sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base' }))
+                      .map((map) => (
+                        <button
+                          key={map.id}
+                          type="button"
+                          onClick={() => onNavigate(`/maps/${map.slug}`)}
+                          className="flex flex-col rounded-2xl overflow-hidden border-2 border-emerald-100 hover:border-emerald-300 hover:shadow-md transition-all text-left bg-white/60"
+                        >
+                          <div className="aspect-video bg-emerald-100/80 flex items-center justify-center overflow-hidden">
+                            {map.backgroundImageUrl ? (
+                              <img
+                                src={map.backgroundImageUrl}
+                                alt=""
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <span className="text-2xl font-serif text-emerald-400">map</span>
+                            )}
+                          </div>
+                          <div className="p-2 min-h-[3rem]">
+                            <span className="text-xs font-semibold text-emerald-900 line-clamp-2">
+                              {map.title}
+                            </span>
+                            <span className="text-[10px] text-emerald-600 font-medium block mt-0.5">
+                              {roleForMap(map, currentUser)}
+                            </span>
+                          </div>
+                        </button>
+                      ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="glass rounded-[2.5rem] p-6 md:p-8 solarpunk-shadow relative overflow-hidden bg-amber-50/20">
+            <div className="absolute -right-10 -top-10 w-40 h-40 bg-amber-200 rounded-full opacity-50" />
+            <div className="absolute -left-12 bottom-0 w-52 h-52 bg-sky-300 rounded-full opacity-35" />
 
             <div className="relative space-y-4">
               <h3 className="text-lg font-bold text-emerald-950">Featured maps</h3>
               <p className="text-xs text-emerald-700">
-                Explore maps built by communities. Add your own and we&apos;ll feature it here when
-                you provide a link and thumbnail.
+                Explore maps built by communities.
               </p>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {EXAMPLE_MAPS.map((map) => (
-                  <button
-                    key={map.href + map.title}
-                    type="button"
-                    onClick={() => handleExampleHref(map.href)}
-                    className="flex flex-col rounded-2xl overflow-hidden border-2 border-emerald-100 hover:border-emerald-300 hover:shadow-md transition-all text-left bg-white/60"
-                  >
-                    <div className="aspect-video bg-emerald-100/80 flex items-center justify-center">
-                      {map.thumbnailUrl ? (
-                        <img
-                          src={map.thumbnailUrl}
-                          alt=""
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <span className="text-2xl font-serif text-emerald-400">map</span>
-                      )}
-                    </div>
-                    <div className="p-2 min-h-[3rem]">
-                      <span className="text-xs font-semibold text-emerald-900 line-clamp-2">
-                        {map.title}
-                      </span>
-                    </div>
-                  </button>
-                ))}
+                {featuredMaps.length === 0 ? (
+                  <p className="text-sm text-emerald-700 col-span-2 sm:col-span-3">
+                    No featured maps yet. Add links to <code className="text-[10px] bg-emerald-100 px-1 rounded">FEATURED_MAP_HREFS</code> in <code className="text-[10px] bg-emerald-100 px-1 rounded">LandingPage.tsx</code>.
+                  </p>
+                ) : (
+                  featuredMaps.map((map) => {
+                    const href = FEATURED_MAP_HREFS.find((h) => slugFromHref(h) === map.slug) ?? `/maps/${map.slug}`;
+                    return (
+                      <button
+                        key={map.id}
+                        type="button"
+                        onClick={() => handleExampleHref(href)}
+                        className="flex flex-col rounded-2xl overflow-hidden border-2 border-emerald-100 hover:border-emerald-300 hover:shadow-md transition-all text-left bg-white/60"
+                      >
+                        <div className="aspect-video bg-emerald-100/80 flex items-center justify-center overflow-hidden">
+                          {map.backgroundImageUrl ? (
+                            <img
+                              src={map.backgroundImageUrl}
+                              alt=""
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <span className="text-2xl font-serif text-emerald-400">map</span>
+                          )}
+                        </div>
+                        <div className="p-2 min-h-[3rem]">
+                          <span className="text-xs font-semibold text-emerald-900 line-clamp-2">
+                            {map.title}
+                          </span>
+                          {map.description && (
+                            <span className="text-[10px] text-emerald-600 line-clamp-2 block mt-0.5">
+                              {map.description}
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
               </div>
             </div>
           </div>

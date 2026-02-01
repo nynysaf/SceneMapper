@@ -1,11 +1,20 @@
 /**
  * Simple cookie-based session for API routes.
  * Cookie name: scene_session. Value: userId.
+ *
+ * For custom domains with apex + www (e.g. scenemapper.ca and www.scenemapper.ca),
+ * set SESSION_COOKIE_DOMAIN=scenemapper.ca so the cookie is shared across both.
  */
 import { NextResponse } from 'next/server';
 
 const COOKIE_NAME = 'scene_session';
-const MAX_AGE = 60 * 60 * 24 * 7; // 7 days
+const MAX_AGE = 60 * 60 * 24 * 365; // 12 months
+
+function getCookieDomain(): string | undefined {
+  const domain = process.env.SESSION_COOKIE_DOMAIN?.trim();
+  if (!domain) return undefined;
+  return domain.startsWith('.') ? domain : `.${domain}`;
+}
 
 export function getSessionCookie(request: Request): string | null {
   const cookieHeader = request.headers.get('cookie');
@@ -15,21 +24,29 @@ export function getSessionCookie(request: Request): string | null {
 }
 
 export function setSessionCookieOnResponse(response: NextResponse, userId: string): void {
-  response.cookies.set(COOKIE_NAME, userId, {
+  const options: Record<string, unknown> = {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     maxAge: MAX_AGE,
     path: '/',
-  });
+  };
+  const domain = getCookieDomain();
+  if (domain) options.domain = domain;
+
+  response.cookies.set(COOKIE_NAME, userId, options);
 }
 
 export function clearSessionCookieOnResponse(response: NextResponse): void {
-  response.cookies.set(COOKIE_NAME, '', {
+  const options: Record<string, unknown> = {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     maxAge: 0,
     path: '/',
-  });
+  };
+  const domain = getCookieDomain();
+  if (domain) options.domain = domain;
+
+  response.cookies.set(COOKIE_NAME, '', options);
 }

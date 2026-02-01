@@ -2,7 +2,13 @@
 
 **Goal:** Make the map page load faster and the codebase simpler, without breaking what works.
 
-**Current working baseline:** Commit `334cbea` (fix: nodes/connections save (UUID + REGION), await saveNodes for new map). Production is working; use this as the rollback point.
+**Current working baseline:** Commit `334cbea` (fix: nodes/connections save (UUID + REGION), await saveNodes for new map). Tag: `speed-baseline`. Use as rollback if needed.
+
+**Completed (Tiers 1–4):**
+- Tier 1: Pass map from page; single load effect
+- Tier 2: Parallel fetch at page level; map shell immediately
+- Tier 3: Combined API `GET /api/maps/[slug]/page`
+- Tier 4: Removed legacy SPA; documented data flow
 
 ---
 

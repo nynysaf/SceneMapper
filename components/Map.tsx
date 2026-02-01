@@ -85,6 +85,10 @@ interface MapProps {
    */
   regionFontScale?: number;
   /**
+   * Font family for REGION node labels. When absent, use Georgia, serif.
+   */
+  regionFontFamily?: string;
+  /**
    * Approved connections to draw as curved lines between nodes.
    */
   connections?: MapConnection[];
@@ -128,6 +132,7 @@ const Map: React.FC<MapProps> = ({
   nodeSizeScale = 1,
   nodeLabelFontScale = 1,
   regionFontScale = 1,
+  regionFontFamily,
   connections = [],
   connectionLineStyle,
   currentUserName,
@@ -309,6 +314,7 @@ const Map: React.FC<MapProps> = ({
         .attr('text-anchor', 'middle')
         .attr('class', isRegion ? 'font-semibold' : 'font-bold fill-emerald-950 pointer-events-none uppercase tracking-wider')
         .style('font-size', isRegion ? `${regionFontSize}px` : `${labelFontSize}px`)
+        .style('font-family', isRegion && regionFontFamily ? regionFontFamily : undefined)
         .style('fill', isRegion ? (categoryColors[d.type] ?? '#4a5568') : undefined)
         .style('paint-order', isRegion ? undefined : 'stroke')
         .style('stroke', isRegion ? undefined : '#fdfcf0')
@@ -389,7 +395,7 @@ const Map: React.FC<MapProps> = ({
       }
     });
 
-  }, [nodes, connections, currentUserName, lineStyle, onNodeMove, onNodeSelect, onMapClick, isEditable, isPlacing, nodeSizeScale, nodeLabelFontScale, regionFontScale, categoryColors, onConnectionCurveChange, exportMode]);
+  }, [nodes, connections, currentUserName, lineStyle, onNodeMove, onNodeSelect, onMapClick, isEditable, isPlacing, nodeSizeScale, nodeLabelFontScale, regionFontScale, regionFontFamily, categoryColors, onConnectionCurveChange, exportMode]);
 
   return (
     <svg 

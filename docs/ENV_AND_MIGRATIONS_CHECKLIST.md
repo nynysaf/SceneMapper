@@ -15,6 +15,8 @@ Set these in **Vercel → Project → Settings → Environment Variables** for *
 | `SUPABASE_SERVICE_ROLE_KEY` | **Yes** | Supabase service_role key (never expose to client) |
 | `RESEND_API_KEY` | No | For invitation emails; omit if not using Resend |
 | `RESEND_FROM_EMAIL` | No | From address (e.g. `onboarding@resend.dev` for sandbox) |
+| `NEXT_PUBLIC_APP_URL` | No | App base URL for invitation email links (e.g. `https://scenemapper.ca`) |
+| `SESSION_COOKIE_DOMAIN` | No | Apex domain for cookie sharing (e.g. `scenemapper.ca`) when using custom domain |
 
 **Important:** `NEXT_PUBLIC_*` is inlined at **build time**. Redeploy after changing env. No typo: use `SUPABASE_SERVICE_ROLE_KEY` (not `SUPABASE_SERVICE_KEY`).
 
