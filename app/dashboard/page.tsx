@@ -2,29 +2,31 @@
 
 import { useEffect, useState } from 'react';
 import Dashboard from '../../components/Dashboard';
-import type { User } from '../../types';
-import { getUsers, getSession, saveUsers, saveSession, clearSession } from '../../lib/data';
+import type { User, SceneMap } from '../../types';
+import { getUsers, getSession, getMaps, saveUsers, saveSession, clearSession } from '../../lib/data';
 
 export default function DashboardPage() {
+  const [sessionLoading, setSessionLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [initialMaps, setInitialMaps] = useState<SceneMap[]>([]);
   const [initialEditSlug, setInitialEditSlug] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    Promise.all([getUsers(), getSession()])
-      .then(([users, session]) => {
-        if (!session) return;
-        const user = users.find((u) => u.id === session.userId) ?? null;
-        setCurrentUser(user);
-      })
-      .catch(() => setCurrentUser(null));
+    const editSlug = new URLSearchParams(window.location.search).get('edit') ?? undefined;
+    setInitialEditSlug(editSlug);
 
-    try {
-      const params = new URLSearchParams(window.location.search);
-      setInitialEditSlug(params.get('edit') ?? undefined);
-    } catch {
-      setInitialEditSlug(undefined);
-    }
+    Promise.all([getUsers(), getSession(), getMaps()])
+      .then(([users, session, maps]) => {
+        const user = session ? (users.find((u) => u.id === session.userId) ?? null) : null;
+        setCurrentUser(user);
+        setInitialMaps(maps);
+      })
+      .catch(() => {
+        setCurrentUser(null);
+        setInitialMaps([]);
+      })
+      .finally(() => setSessionLoading(false));
   }, []);
 
   const navigate = (path: string) => {
@@ -121,6 +123,15 @@ export default function DashboardPage() {
     setCurrentUser(null);
   };
 
+  if (sessionLoading) {
+    return (
+      <div className="w-screen h-screen bg-[#fdfcf0] flex flex-col items-center justify-center gap-4">
+        <div className="w-10 h-10 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm font-medium text-emerald-800">Loading dashboard…</p>
+      </div>
+    );
+  }
+
   return (
     <Dashboard
       onNavigate={navigate}
@@ -129,6 +140,7 @@ export default function DashboardPage() {
       onLogin={handleLogin}
       onSignup={handleSignup}
       initialEditSlug={initialEditSlug}
+      initialMaps={initialMaps}
     />
   );
 }

@@ -15,12 +15,13 @@ function apiBase(): string {
   return '';
 }
 
-function fetchOpts(method: string, body?: unknown): RequestInit {
+function fetchOpts(method: string, body?: unknown, keepalive = false): RequestInit {
   return {
     method,
     credentials: 'include',
     headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
     body: body !== undefined ? JSON.stringify(body) : undefined,
+    keepalive,
   };
 }
 
@@ -98,7 +99,7 @@ async function getNodesApi(mapSlug: string, options?: DataLayerOptions): Promise
 }
 
 async function saveNodesApi(mapSlug: string, nodes: MapNode[]): Promise<void> {
-  const r = await fetch(`${apiBase()}/api/maps/${encodeURIComponent(mapSlug)}/nodes`, fetchOpts('PUT', nodes));
+  const r = await fetch(`${apiBase()}/api/maps/${encodeURIComponent(mapSlug)}/nodes`, fetchOpts('PUT', nodes, true));
   if (!r.ok) throw new Error(`saveNodes: ${r.status}`);
 }
 
@@ -114,7 +115,7 @@ async function getConnectionsApi(mapSlug: string, options?: DataLayerOptions): P
 }
 
 async function saveConnectionsApi(mapSlug: string, connections: MapConnection[]): Promise<void> {
-  const r = await fetch(`${apiBase()}/api/maps/${encodeURIComponent(mapSlug)}/connections`, fetchOpts('PUT', connections));
+  const r = await fetch(`${apiBase()}/api/maps/${encodeURIComponent(mapSlug)}/connections`, fetchOpts('PUT', connections, true));
   if (!r.ok) throw new Error(`saveConnections: ${r.status}`);
 }
 

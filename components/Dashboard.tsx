@@ -22,6 +22,10 @@ interface DashboardProps {
    * navigating from a map back to the dashboard.
    */
   initialEditSlug?: string;
+  /**
+   * Maps loaded by the page in parallel with session (avoids waterfall and speeds up edit flow).
+   */
+  initialMaps?: SceneMap[];
 }
 
 const THEME_PRESETS: { id: string; label: string; description: string; theme: MapTheme }[] = [
@@ -140,13 +144,14 @@ const Dashboard: React.FC<DashboardProps> = ({
   onLogin,
   onSignup,
   initialEditSlug,
+  initialMaps = [],
 }) => {
   const [mode, setMode] = useState<'login' | 'signup'>('signup');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState<string | null>(null);
-  const [maps, setMaps] = useState<SceneMap[]>([]);
+  const [maps, setMaps] = useState<SceneMap[]>(initialMaps);
   const [mapTitle, setMapTitle] = useState('');
   const [mapSlug, setMapSlug] = useState('');
   const [mapDescription, setMapDescription] = useState('');
@@ -263,13 +268,13 @@ const Dashboard: React.FC<DashboardProps> = ({
     return copy;
   }, [maps, mapListSort]);
 
-  // Hydrate maps from data layer (abort on unmount so we don't overwrite state after navigation)
+  // Hydrate maps from data layer (refresh in background; we already have initialMaps so edit form can show immediately)
   useEffect(() => {
     const ac = new AbortController();
     getMaps({ signal: ac.signal })
       .then(setMaps)
       .catch((err) => {
-        if (!isAbortError(err)) setMaps([]);
+        if (!isAbortError(err)) setMaps((prev) => (prev.length > 0 ? prev : []));
       });
     return () => ac.abort();
   }, []);

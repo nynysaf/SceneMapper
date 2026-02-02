@@ -109,6 +109,7 @@ const MapExperience: React.FC<MapExperienceProps> = ({
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editWebsite, setEditWebsite] = useState('');
+  const [editType, setEditType] = useState<NodeType>(NodeType.EVENT);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [hasShownReviewThisSession, setHasShownReviewThisSession] = useState(false);
   const [nodeSizeScale, setNodeSizeScale] = useState(1);
@@ -120,6 +121,8 @@ const MapExperience: React.FC<MapExperienceProps> = ({
   const [isExporting, setIsExporting] = useState(false);
   const [exportFormat, setExportFormat] = useState<'jpeg' | 'png' | 'pdf' | null>(null);
   const mapCaptureRef = useRef<HTMLDivElement | null>(null);
+  const nodesRef = useRef<MapNode[]>([]);
+  const connectionsRef = useRef<MapConnection[]>([]);
   const [backgroundImageSize, setBackgroundImageSize] = useState<{ width: number; height: number } | null>(null);
 
   // Resolve background image dimensions for export (use when present, else default 1000x1000)
@@ -190,6 +193,8 @@ const MapExperience: React.FC<MapExperienceProps> = ({
     if (initialNodes !== undefined && initialConnections !== undefined) {
       setNodes(initialNodes);
       setConnections(initialConnections);
+      nodesRef.current = initialNodes;
+      connectionsRef.current = initialConnections;
       Promise.all([getUsers(), getSession()])
         .then(([users, session]) => { if (!ac.signal.aborted) applyRole(users, session); })
         .catch(() => { /* ignore */ });
@@ -204,23 +209,40 @@ const MapExperience: React.FC<MapExperienceProps> = ({
     ])
       .then(([loadedNodes, loadedConnections, users, session]) => {
         if (ac.signal.aborted) return;
-        setNodes(
-          loadedNodes.length ? loadedNodes : effectiveSlug === 'torontopia' ? INITIAL_NODES : []
-        );
+        const nodesToSet = loadedNodes.length ? loadedNodes : effectiveSlug === 'torontopia' ? INITIAL_NODES : [];
+        setNodes(nodesToSet);
         setConnections(loadedConnections);
+        nodesRef.current = nodesToSet;
+        connectionsRef.current = loadedConnections;
         applyRole(users, session);
       })
       .catch((err) => {
         if (isAbortError(err)) return;
         setNodes(effectiveSlug === 'torontopia' ? INITIAL_NODES : []);
         setConnections([]);
+        nodesRef.current = effectiveSlug === 'torontopia' ? INITIAL_NODES : [];
+        connectionsRef.current = [];
       });
     return () => ac.abort();
   }, [effectiveSlug, map, isDataLoading, initialNodes, initialConnections]);
 
+  // Flush nodes and connections on unmount so in-flight saves aren't lost when user closes/navigates away
+  useEffect(() => {
+    return () => {
+      const slug = effectiveSlug;
+      const n = nodesRef.current;
+      const c = connectionsRef.current;
+      if (n.length > 0 || c.length > 0) {
+        void persistNodes(slug, n);
+        void persistConnections(slug, c);
+      }
+    };
+  }, [effectiveSlug]);
+
   const saveNodes = useCallback(
     (newNodes: MapNode[]) => {
       setNodes(newNodes);
+      nodesRef.current = newNodes;
       void persistNodes(effectiveSlug, newNodes);
     },
     [effectiveSlug],
@@ -229,6 +251,7 @@ const MapExperience: React.FC<MapExperienceProps> = ({
   const saveConnections = useCallback(
     (newConnections: MapConnection[]) => {
       setConnections(newConnections);
+      connectionsRef.current = newConnections;
       void persistConnections(effectiveSlug, newConnections);
     },
     [effectiveSlug],
@@ -638,6 +661,7 @@ const MapExperience: React.FC<MapExperienceProps> = ({
     setEditTitle(node.title);
     setEditDescription(node.description);
     setEditWebsite(node.website || '');
+    setEditType(node.type);
     setIsEditOpen(true);
   };
 
@@ -651,6 +675,7 @@ const MapExperience: React.FC<MapExperienceProps> = ({
             title: editTitle,
             description: editDescription,
             website: editWebsite || undefined,
+            type: editType,
           }
         : n,
     );
@@ -1069,6 +1094,27 @@ const MapExperience: React.FC<MapExperienceProps> = ({
               onSubmit={handleSaveEdit}
               className="p-8 space-y-6 overflow-y-auto max-h-[70vh] bg-white/40"
             >
+              <div className="space-y-2">
+                <label className="text-[11px] font-semibold text-emerald-900 block">Category</label>
+                <div className="flex flex-wrap gap-2">
+                  {enabledNodeTypes
+                    .filter((t) => t !== NodeType.REGION || userSession.role === 'admin')
+                    .map((type) => (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => setEditType(type)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border-2 transition-all ${
+                          editType === type
+                            ? 'bg-emerald-600 border-emerald-600 text-white'
+                            : 'border-emerald-100 text-emerald-700 hover:border-emerald-300'
+                        }`}
+                      >
+                        {type}
+                      </button>
+                    ))}
+                </div>
+              </div>
               <div className="space-y-1">
                 <label className="text-[11px] font-semibold text-emerald-900">Title</label>
                 <input
