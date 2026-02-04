@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Dashboard from '../../components/Dashboard';
 import type { User, SceneMap } from '../../types';
-import { getUsers, getSession, getMaps, saveUsers, saveSession, clearSession } from '../../lib/data';
+import { getSession, getMaps, clearSession } from '../../lib/data';
 
 export default function DashboardPage() {
   const [sessionLoading, setSessionLoading] = useState(true);
@@ -16,9 +16,16 @@ export default function DashboardPage() {
     const editSlug = new URLSearchParams(window.location.search).get('edit') ?? undefined;
     setInitialEditSlug(editSlug);
 
-    Promise.all([getUsers(), getSession(), getMaps()])
-      .then(([users, session, maps]) => {
-        const user = session ? (users.find((u) => u.id === session.userId) ?? null) : null;
+    Promise.all([getSession(), getMaps()])
+      .then(([session, maps]) => {
+        const user = session
+          ? {
+              id: session.userId,
+              email: session.email ?? '',
+              name: session.name ?? 'User',
+              password: '',
+            }
+          : null;
         setCurrentUser(user);
         setInitialMaps(maps);
       })
@@ -39,7 +46,7 @@ export default function DashboardPage() {
 
     if (useBackend) {
       try {
-        const r = await fetch('/api/users', {
+        const r = await fetch('/api/auth/signup', {
           method: 'POST',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
@@ -49,8 +56,8 @@ export default function DashboardPage() {
         if (!r.ok) {
           return { ok: false as const, error: (data as { error?: string }).error || 'Signup failed' };
         }
-        const user = (data as { user?: User }).user;
-        if (user) setCurrentUser({ ...user, password: '' });
+        const user = (data as { user?: { userId: string; email: string; name: string } }).user;
+        if (user) setCurrentUser({ id: user.userId, email: user.email, name: user.name, password: '' });
         navigate('/');
         return { ok: true as const };
       } catch {
@@ -58,6 +65,7 @@ export default function DashboardPage() {
       }
     }
 
+    const { getUsers, saveUsers, saveSession } = await import('../../lib/data');
     const users = await getUsers();
     const existing = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
     if (existing) {
@@ -93,17 +101,16 @@ export default function DashboardPage() {
         if (!r.ok) {
           return { ok: false as const, error: (data as { error?: string }).error || 'Invalid email or password.' };
         }
-        const userId = (data as { userId?: string }).userId;
-        if (!userId) return { ok: false as const, error: 'Invalid response from server.' };
-        const users = await getUsers();
-        const user = users.find((u) => u.id === userId) ?? null;
-        if (user) setCurrentUser(user);
+        const user = (data as { user?: { userId: string; email: string; name: string } }).user;
+        if (user) setCurrentUser({ id: user.userId, email: user.email, name: user.name, password: '' });
+        navigate('/');
         return { ok: true as const };
       } catch {
         return { ok: false as const, error: 'Network error. Please try again.' };
       }
     }
 
+    const { getUsers, saveSession } = await import('../../lib/data');
     const users = await getUsers();
     const user = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
 
@@ -139,6 +146,7 @@ export default function DashboardPage() {
       onLogout={handleLogout}
       onLogin={handleLogin}
       onSignup={handleSignup}
+      showForgotPassword={process.env.NEXT_PUBLIC_USE_BACKEND === 'true'}
       initialEditSlug={initialEditSlug}
       initialMaps={initialMaps}
     />

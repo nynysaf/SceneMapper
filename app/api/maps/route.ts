@@ -4,19 +4,32 @@ import { supabase } from '@/lib/supabase-server';
 import { dbMapToSceneMap, sceneMapToDbMap } from '@/lib/db-mappers';
 import { hashPassword } from '@/lib/password';
 import { sendInvitationEmail } from '@/lib/invitation-email';
+import { getCurrentUserId } from '@/lib/auth-api';
 
 /**
  * GET /api/maps
- * Returns all maps from the database.
+ * Returns maps the user can access: public maps plus maps where user is admin or collaborator.
  */
 export async function GET() {
   try {
+    const userId = await getCurrentUserId();
     const { data, error } = await supabase.from('maps').select('*').order('created_at', { ascending: false });
     if (error) {
       console.error('GET /api/maps', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
-    const maps: SceneMap[] = (data ?? []).map(dbMapToSceneMap);
+    let rows = data ?? [];
+    if (!userId) {
+      rows = rows.filter((r) => r.public_view === true);
+    } else {
+      rows = rows.filter(
+        (r) =>
+          r.public_view === true ||
+          (Array.isArray(r.admin_ids) && r.admin_ids.includes(userId)) ||
+          (Array.isArray(r.collaborator_ids) && r.collaborator_ids.includes(userId)),
+      );
+    }
+    const maps: SceneMap[] = rows.map(dbMapToSceneMap);
     return NextResponse.json(maps);
   } catch (err) {
     console.error('GET /api/maps', err);

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import LandingPage, { FEATURED_MAP_HREFS, slugFromHref } from '../components/LandingPage';
 import type { User, SceneMap } from '../types';
-import { getUsers, getSession, getMaps, isAbortError } from '../lib/data';
+import { getSession, getMaps, isAbortError } from '../lib/data';
 
 /**
  * Next.js App Router landing page for Scene Mapper.
@@ -17,16 +17,16 @@ export default function HomePage() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const ac = new AbortController();
-    Promise.all([
-      getMaps({ signal: ac.signal }),
-      getUsers(),
-      getSession(),
-    ])
-      .then(([maps, users, session]) => {
+    Promise.all([getMaps({ signal: ac.signal }), getSession()])
+      .then(([maps, session]) => {
         setAllMaps(maps);
         if (session) {
-          const user = users.find((u) => u.id === session.userId) ?? null;
-          setCurrentUser(user);
+          setCurrentUser({
+            id: session.userId,
+            email: session.email ?? '',
+            name: session.name ?? 'User',
+            password: '',
+          });
         }
       })
       .catch((err) => {

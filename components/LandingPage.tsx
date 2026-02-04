@@ -68,9 +68,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, currentUser, user
         </div>
         <div className="flex items-center gap-3">
           {currentUser ? (
-            <span className="hidden md:inline text-xs text-emerald-800">
+            <button
+              onClick={() => onNavigate('/account')}
+              className="hidden md:inline text-xs text-emerald-800 hover:underline text-left"
+            >
               Signed in as <span className="font-semibold">{currentUser.email}</span>
-            </span>
+            </button>
           ) : (
             <button
               onClick={() => onNavigate('/dashboard')}

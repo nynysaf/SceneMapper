@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { MapNode, MapConnection, NodeType, UserSession, MapTheme, SceneMap, User, AuthSession } from '../types';
 import { INITIAL_NODES, CATEGORY_COLORS } from '../constants';
-import { getNodes as loadNodes, saveNodes as persistNodes, getConnections as loadConnections, saveConnections as persistConnections, getUsers, getSession, getMaps, saveMaps, isAbortError } from '../lib/data';
+import { getNodes as loadNodes, saveNodes as persistNodes, getConnections as loadConnections, saveConnections as persistConnections, getSession, getMaps, saveMaps, isAbortError } from '../lib/data';
 import Map from './Map';
 import Sidebar from './Sidebar';
 import SubmissionModal from './SubmissionModal';
@@ -172,10 +172,9 @@ const MapExperience: React.FC<MapExperienceProps> = ({
     const ac = new AbortController();
     const opts = { signal: ac.signal };
 
-    const applyRole = (users: Awaited<ReturnType<typeof getUsers>>, session: Awaited<ReturnType<typeof getSession>>) => {
+    const applyRole = (session: Awaited<ReturnType<typeof getSession>>) => {
       if (ac.signal.aborted || !session) return;
-      const currentUser = users.find((u) => u.id === session.userId);
-      if (!currentUser) return;
+      const currentUser = { id: session.userId, email: session.email ?? '', name: session.name ?? 'User' };
       let role: UserSession['role'] = 'public';
       if (map) {
         setHasCollaboratorPassword(!!map.collaboratorPassword);
@@ -195,8 +194,8 @@ const MapExperience: React.FC<MapExperienceProps> = ({
       setConnections(initialConnections);
       nodesRef.current = initialNodes;
       connectionsRef.current = initialConnections;
-      Promise.all([getUsers(), getSession()])
-        .then(([users, session]) => { if (!ac.signal.aborted) applyRole(users, session); })
+      Promise.all([getSession()])
+        .then(([session]) => { if (!ac.signal.aborted) applyRole(session); })
         .catch(() => { /* ignore */ });
       return () => ac.abort();
     }
@@ -204,17 +203,16 @@ const MapExperience: React.FC<MapExperienceProps> = ({
     Promise.all([
       loadNodes(effectiveSlug, opts),
       loadConnections(effectiveSlug, opts),
-      getUsers(),
       getSession(),
     ])
-      .then(([loadedNodes, loadedConnections, users, session]) => {
+      .then(([loadedNodes, loadedConnections, session]) => {
         if (ac.signal.aborted) return;
         const nodesToSet = loadedNodes.length ? loadedNodes : effectiveSlug === 'torontopia' ? INITIAL_NODES : [];
         setNodes(nodesToSet);
         setConnections(loadedConnections);
         nodesRef.current = nodesToSet;
         connectionsRef.current = loadedConnections;
-        applyRole(users, session);
+        applyRole(session);
       })
       .catch((err) => {
         if (isAbortError(err)) return;
@@ -614,6 +612,35 @@ const MapExperience: React.FC<MapExperienceProps> = ({
 
     if (!userSession.id || !effectiveSlug) {
       setJoinError('You need to be logged in to join as a collaborator.');
+      return;
+    }
+
+    const useBackend = typeof process !== 'undefined' && process.env.NEXT_PUBLIC_USE_BACKEND === 'true';
+
+    if (useBackend) {
+      try {
+        const r = await fetch(`/api/maps/${encodeURIComponent(effectiveSlug)}/join`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: joinPassword.trim() }),
+        });
+        const data = await r.json();
+        if (!r.ok) {
+          setJoinError((data as { error?: string }).error || 'Could not join as collaborator.');
+          return;
+        }
+        setUserSession((prev) => ({
+          ...prev,
+          role: 'collaborator',
+          name: prev.name || userSession.email || 'Collaborator',
+        }));
+        setIsJoinOpen(false);
+        setJoinPassword('');
+        setJoinError(null);
+      } catch {
+        setJoinError('Something went wrong while joining as collaborator.');
+      }
       return;
     }
 

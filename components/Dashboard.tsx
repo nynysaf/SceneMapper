@@ -17,6 +17,8 @@ interface DashboardProps {
   onLogout: () => void;
   onLogin: (email: string, password: string) => { ok: boolean; error?: string } | Promise<{ ok: boolean; error?: string }>;
   onSignup: (name: string, email: string, password: string) => { ok: boolean; error?: string } | Promise<{ ok: boolean; error?: string }>;
+  /** When true, show "Forgot password?" option (backend auth) */
+  showForgotPassword?: boolean;
   /**
    * Optional slug used to pre-open a map in edit mode when
    * navigating from a map back to the dashboard.
@@ -143,6 +145,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   onLogout,
   onLogin,
   onSignup,
+  showForgotPassword = false,
   initialEditSlug,
   initialMaps = [],
 }) => {
@@ -150,7 +153,13 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [authError, setAuthError] = useState<string | null>(null);
+  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotSuccess, setForgotSuccess] = useState(false);
+  const [forgotError, setForgotError] = useState<string | null>(null);
+  const [forgotSubmitting, setForgotSubmitting] = useState(false);
   const [maps, setMaps] = useState<SceneMap[]>(initialMaps);
   const [mapTitle, setMapTitle] = useState('');
   const [mapSlug, setMapSlug] = useState('');
@@ -158,6 +167,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [mapError, setMapError] = useState<string | null>(null);
   const [selectedThemeId, setSelectedThemeId] = useState<string>(DEFAULT_THEME.id);
   const [collaboratorPassword, setCollaboratorPassword] = useState('');
+  const [publicView, setPublicView] = useState(true);
   const [invitedAdmins, setInvitedAdmins] = useState('');
   const [invitedCollaborators, setInvitedCollaborators] = useState('');
   const [backgroundFile, setBackgroundFile] = useState<File | null>(null);
@@ -292,6 +302,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     setMapDescription(match.description);
     setSelectedThemeId(match.themeId || DEFAULT_THEME.id);
     setCollaboratorPassword(match.collaboratorPassword || '');
+    setPublicView(match.publicView !== false);
     setInvitedAdmins((match.invitedAdminEmails || []).join(', '));
     setInvitedCollaborators((match.invitedCollaboratorEmails || []).join(', '));
     setInvitationEmailSubjectAdmin(match.invitationEmailSubjectAdmin ?? '');
@@ -334,11 +345,45 @@ const Dashboard: React.FC<DashboardProps> = ({
     return saveMaps(next);
   };
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setForgotError(null);
+    setForgotSuccess(false);
+    const emailToUse = forgotEmail.trim() || email.trim();
+    if (!emailToUse) {
+      setForgotError('Please enter your email address.');
+      return;
+    }
+    setForgotSubmitting(true);
+    try {
+      const r = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailToUse }),
+      });
+      const data = await r.json();
+      if (!r.ok) {
+        setForgotError((data as { error?: string }).error || 'Something went wrong. Please try again.');
+        return;
+      }
+      setForgotSuccess(true);
+    } catch {
+      setForgotError('Network error. Please try again.');
+    } finally {
+      setForgotSubmitting(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError(null);
 
     if (mode === 'signup') {
+      if (password !== confirmPassword) {
+        setAuthError('Passwords do not match.');
+        return;
+      }
       const result = await Promise.resolve(onSignup(name.trim() || 'Explorer', email.trim(), password));
       if (!result.ok) {
         setAuthError(result.error || 'Could not create account.');
@@ -451,7 +496,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       description: mapDescription.trim(),
       theme: selectedTheme,
       collaboratorPassword: collaboratorPassword.trim() || undefined,
-      publicView: true,
+      publicView,
       themeId: selectedThemeId === baseThemeId ? selectedPreset.id : 'custom',
       invitedAdminEmails: parseEmails(invitedAdmins),
       invitedCollaboratorEmails: parseEmails(invitedCollaborators),
@@ -493,7 +538,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         collaboratorPassword: baseFields.collaboratorPassword,
         adminIds: [currentUser.id],
         collaboratorIds: [],
-        publicView: true,
+        publicView: baseFields.publicView ?? true,
         themeId: baseFields.themeId,
         invitedAdminEmails: baseFields.invitedAdminEmails,
         invitedCollaboratorEmails: baseFields.invitedCollaboratorEmails,
@@ -584,9 +629,12 @@ const Dashboard: React.FC<DashboardProps> = ({
         <div className="flex items-center gap-3 text-xs text-emerald-800">
           {currentUser ? (
             <>
-              <span className="hidden md:inline">
+              <a
+                href="/account"
+                className="hidden md:inline hover:underline"
+              >
                 Signed in as <span className="font-semibold">{currentUser.email}</span>
-              </span>
+              </a>
               <button
                 onClick={onLogout}
                 className="px-3 py-1 rounded-full bg-emerald-100 font-semibold hover:bg-emerald-200 transition-colors"
@@ -1000,8 +1048,20 @@ const Dashboard: React.FC<DashboardProps> = ({
                         </label>
                       </div>
                     </div>
-                    <div className="pt-3 border-t border-emerald-100 space-y-1">
-                      <label className="text-sm font-semibold text-emerald-900">
+                    <div className="pt-3 border-t border-emerald-100 space-y-3">
+                      <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-emerald-900">
+                        <input
+                          type="checkbox"
+                          checked={publicView}
+                          onChange={(e) => setPublicView(e.target.checked)}
+                          className="rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
+                        />
+                        Public map (anyone with the link can view)
+                      </label>
+                      <p className="text-xs text-emerald-700">
+                        Uncheck to restrict viewing to admins and collaborators only.
+                      </p>
+                      <label className="text-sm font-semibold text-emerald-900 block pt-2">
                         Collaborator password
                         <span className="ml-1 text-xs font-normal text-emerald-700">
                           (optional)
@@ -1200,6 +1260,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     onClick={() => {
                       setMode('signup');
                       setAuthError(null);
+                      setConfirmPassword('');
                     }}
                     className={`flex-1 text-xs font-semibold py-2 rounded-full ${
                       mode === 'signup'
@@ -1214,6 +1275,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     onClick={() => {
                       setMode('login');
                       setAuthError(null);
+                      setConfirmPassword('');
                     }}
                     className={`flex-1 text-xs font-semibold py-2 rounded-full ${
                       mode === 'login'
@@ -1225,6 +1287,55 @@ const Dashboard: React.FC<DashboardProps> = ({
                   </button>
                 </div>
 
+                {forgotPasswordOpen && showForgotPassword ? (
+                  <form onSubmit={handleForgotPassword} className="space-y-3">
+                    <p className="text-sm text-emerald-800">
+                      Enter your email and we&apos;ll send you a link to reset your password.
+                    </p>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-emerald-900">Email</label>
+                      <input
+                        type="email"
+                        required
+                        className="w-full bg-white/70 border border-emerald-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-400"
+                        placeholder="you@example.org"
+                        value={forgotEmail || email}
+                        onChange={(e) => setForgotEmail(e.target.value)}
+                      />
+                    </div>
+                    {forgotError && (
+                      <p className="text-xs text-rose-600 bg-rose-50 border border-rose-100 rounded-xl px-3 py-2">
+                        {forgotError}
+                      </p>
+                    )}
+                    {forgotSuccess && (
+                      <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2">
+                        If an account exists, we&apos;ve sent a reset link to that email.
+                      </p>
+                    )}
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setForgotPasswordOpen(false);
+                          setForgotError(null);
+                          setForgotSuccess(false);
+                          setForgotEmail('');
+                        }}
+                        className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-emerald-800 bg-emerald-100 hover:bg-emerald-200 transition-colors"
+                      >
+                        Back
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={forgotSubmitting}
+                        className="flex-1 bg-emerald-600 text-white py-2.5 rounded-xl font-semibold text-sm hover:bg-emerald-700 transition-colors disabled:opacity-60"
+                      >
+                        {forgotSubmitting ? 'Sending…' : 'Send reset link'}
+                      </button>
+                    </div>
+                  </form>
+                ) : (
                 <form onSubmit={handleSubmit} className="space-y-3">
                   {mode === 'signup' && (
                     <div className="space-y-1">
@@ -1260,6 +1371,19 @@ const Dashboard: React.FC<DashboardProps> = ({
                       onChange={(e) => setPassword(e.target.value)}
                     />
                   </div>
+                  {mode === 'signup' && (
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-emerald-900">Confirm password</label>
+                      <input
+                        type="password"
+                        required
+                        className="w-full bg-white/70 border border-emerald-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-400"
+                        placeholder="Retype your password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                      />
+                    </div>
+                  )}
 
                   {authError && (
                     <p className="text-xs text-rose-600 bg-rose-50 border border-rose-100 rounded-xl px-3 py-2">
@@ -1267,13 +1391,25 @@ const Dashboard: React.FC<DashboardProps> = ({
                     </p>
                   )}
 
-                  <button
-                    type="submit"
-                    className="w-full bg-emerald-600 text-white py-3 rounded-2xl font-semibold text-sm hover:bg-emerald-700 transition-colors mt-1"
-                  >
-                    {mode === 'signup' ? 'Create account' : 'Log in'}
-                  </button>
+                  <div className="flex flex-col gap-2">
+                    <button
+                      type="submit"
+                      className="w-full bg-emerald-600 text-white py-3 rounded-2xl font-semibold text-sm hover:bg-emerald-700 transition-colors mt-1"
+                    >
+                      {mode === 'signup' ? 'Create account' : 'Log in'}
+                    </button>
+                    {mode === 'login' && showForgotPassword && (
+                      <button
+                        type="button"
+                        onClick={() => setForgotPasswordOpen(true)}
+                        className="text-xs text-emerald-700 hover:text-emerald-900 underline underline-offset-2"
+                      >
+                        Forgot password?
+                      </button>
+                    )}
+                  </div>
                 </form>
+                )}
 
                 <p className="text-[10px] text-emerald-700 mt-2">
                   Accounts are stored locally in this browser for now. A future backend will handle
@@ -1334,6 +1470,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                           setMapDescription(map.description);
                           setSelectedThemeId(map.themeId || DEFAULT_THEME.id);
                           setCollaboratorPassword(map.collaboratorPassword || '');
+                          setPublicView(map.publicView !== false);
                           setInvitedAdmins((map.invitedAdminEmails || []).join(', '));
                           setInvitedCollaborators((map.invitedCollaboratorEmails || []).join(', '));
                           setInvitationEmailSubjectAdmin(map.invitationEmailSubjectAdmin ?? '');

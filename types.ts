@@ -193,4 +193,6 @@ export interface User {
 
 export interface AuthSession {
   userId: string;
+  email?: string;
+  name?: string;
 }

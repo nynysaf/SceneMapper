@@ -10,14 +10,18 @@ View your app in AI Studio: https://ai.studio/apps/drive/1_OP47iK8r-vGRrLFOmT7ol
 
 ## Run Locally
 
-**Prerequisites:**  Node.js
-
+**Prerequisites:** Node.js
 
 1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+   ```
+   npm install
+   ```
+2. **Before first run:** Follow [docs/BEFORE_FIRST_RUN.md](docs/BEFORE_FIRST_RUN.md) to set up Supabase, environment variables, and Auth.
+3. Copy [.env.example](.env.example) to `.env.local` and fill in your values.
+4. Run the app:
+   ```
+   npm run dev
+   ```
 
 ## Before deploy
 
