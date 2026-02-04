@@ -806,7 +806,7 @@ const MapExperience: React.FC<MapExperienceProps> = ({
               </Link>
             </div>
         </div>
-        {/* Role/mode + Join + Review — top-right */}
+        {/* Join + Review — top-right (permissions button moved to bottom-left) */}
         <div className="pointer-events-auto flex items-center gap-2 shrink-0">
           {canShowJoin && (
             <button
@@ -820,19 +820,6 @@ const MapExperience: React.FC<MapExperienceProps> = ({
               Join as collaborator
             </button>
           )}
-          <button
-            onClick={switchRole}
-            className="glass px-3 py-1.5 md:px-4 md:py-2 rounded-lg md:rounded-xl text-xs md:text-sm font-semibold flex items-center gap-1 md:gap-2 text-emerald-800 hover:bg-emerald-50 transition-colors min-h-[44px] md:min-h-0"
-          >
-            {userSession.role === 'admin' ? (
-              <ShieldCheck size={16} className="md:w-[18px] md:h-[18px]" />
-            ) : userSession.role === 'collaborator' ? (
-              <Users size={16} className="md:w-[18px] md:h-[18px]" />
-            ) : (
-              <Info size={16} className="md:w-[18px] md:h-[18px]" />
-            )}
-            <span>{userSession.role.charAt(0).toUpperCase() + userSession.role.slice(1)}</span>
-          </button>
           {userSession.role === 'admin' && pendingReviewCount > 0 && (
             <button
               onClick={() => setIsAdminReviewOpen(true)}
@@ -1016,11 +1003,7 @@ const MapExperience: React.FC<MapExperienceProps> = ({
         {selectedNode && popupAnchor && (
           <>
             <div
-              className="fixed inset-0 z-[59]"
-              onClick={() => {
-                setSelectedNodes([]);
-                setPopupAnchor(null);
-              }}
+              className="fixed inset-0 z-[59] pointer-events-none"
               aria-hidden="true"
             />
             <NodePopup
@@ -1285,11 +1268,27 @@ const MapExperience: React.FC<MapExperienceProps> = ({
         </div>
       )}
 
-      {/* Contextual Instructions */}
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-40 md:left-6 md:translate-x-0">
-        <div className="glass p-3 px-5 rounded-full text-xs font-semibold text-emerald-800 solarpunk-shadow border-emerald-200">
-          🌱 {pendingNode ? 'Select a location on the map.' : 'Click around and find out'}
-        </div>
+      {/* Permissions mode — bottom-left (replaces "Click around and find out") */}
+      <div className="absolute bottom-[max(1.5rem,env(safe-area-inset-bottom))] md:bottom-10 left-4 md:left-6 z-40">
+        {pendingNode ? (
+          <div className="glass p-3 px-5 rounded-full text-xs font-semibold text-emerald-800 solarpunk-shadow border-emerald-200">
+            🌱 Select a location on the map.
+          </div>
+        ) : (
+          <button
+            onClick={switchRole}
+            className="glass px-3 py-2 md:px-4 md:py-2.5 rounded-xl md:rounded-2xl text-xs md:text-sm font-semibold flex items-center gap-1.5 md:gap-2 text-emerald-800 hover:bg-emerald-50/80 transition-colors solarpunk-shadow border-emerald-200 min-h-[44px] md:min-h-0"
+          >
+            {userSession.role === 'admin' ? (
+              <ShieldCheck size={16} className="md:w-[18px] md:h-[18px]" />
+            ) : userSession.role === 'collaborator' ? (
+              <Users size={16} className="md:w-[18px] md:h-[18px]" />
+            ) : (
+              <Info size={16} className="md:w-[18px] md:h-[18px]" />
+            )}
+            <span>{userSession.role.charAt(0).toUpperCase() + userSession.role.slice(1)}</span>
+          </button>
+        )}
       </div>
     </div>
   );

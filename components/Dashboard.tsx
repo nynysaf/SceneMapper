@@ -1074,7 +1074,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         Roles & permissions
                       </button>
                       {rolesSectionOpen && (
-                      <div className="p-4 pt-0 space-y-2">
+                      <div className="p-4 pt-4 space-y-2">
                     <div className="space-y-2 pb-4">
                       <label className="text-sm font-semibold text-emerald-900 block">
                         Show on map
@@ -1197,7 +1197,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         Advanced
                       </button>
                       {advancedSectionOpen && (
-                      <div className="p-4 pt-0 space-y-2">
+                      <div className="p-4 pt-4 space-y-2">
                         <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-emerald-900">
                           <input
                             type="checkbox"
@@ -1210,8 +1210,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         <p className="text-xs text-emerald-700 -mt-1">
                           Proud of your map? Share it to inspire others!
                         </p>
-                        {editingMapId && (
-                        <div className="space-y-2 pt-2 pb-6">
+                        <div className="space-y-2 pt-4 pb-6">
                           <label className="text-sm font-semibold text-emerald-900">
                             Upload data
                           <span className="ml-1 text-xs font-normal text-emerald-700">
@@ -1261,7 +1260,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         {uploadFile && !uploadResult && (
                           <button
                             type="button"
-                            disabled={isUploading}
+                            disabled={isUploading || !editingMapId}
                             onClick={async () => {
                               if (!uploadFile || !editingOriginalSlug) return;
                               setIsUploading(true);
@@ -1290,6 +1289,11 @@ const Dashboard: React.FC<DashboardProps> = ({
                           >
                             {isUploading ? 'Processing...' : 'Process upload'}
                           </button>
+                        )}
+                        {!editingMapId && (
+                          <p className="text-xs text-emerald-600 italic">
+                            Create your map first, then return to Edit Map to upload data.
+                          </p>
                         )}
                         {uploadResult && (
                           <div className="text-xs bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2 space-y-1">
@@ -1325,7 +1329,6 @@ const Dashboard: React.FC<DashboardProps> = ({
                           </p>
                         )}
                         </div>
-                        )}
                       </div>
                       )}
                     </div>
