@@ -3,7 +3,7 @@
 import { use, useEffect, useMemo, useState } from 'react';
 import MapExperience from '../../../components/MapExperience';
 import type { SceneMap, MapNode, MapConnection } from '../../../types';
-import { getMapPageData, isAbortError } from '../../../lib/data';
+import { getMapPageData, recordMapView, isAbortError } from '../../../lib/data';
 import { INITIAL_NODES } from '../../../constants';
 
 /**
@@ -34,6 +34,7 @@ export default function MapPage({ params }: { params: Promise<{ slug: string }> 
         );
         setConnections(loadedConnections);
         setLoaded(true);
+        if (m) recordMapView(slug, opts);
       })
       .catch((err) => {
         if (!isAbortError(err)) {

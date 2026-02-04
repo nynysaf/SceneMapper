@@ -354,22 +354,20 @@ function hasRecoveryInHash(): boolean {
 
 export default function AccountPage() {
   const [user, setUser] = useState<User | null>(null);
-  const [isRecovery, setIsRecovery] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
+    // Redirect password reset links to dedicated /reset-password page
+    if (hasRecoveryInHash()) {
+      window.location.href = '/reset-password' + (window.location.hash || '');
+      return;
+    }
+
     const supabase = createClient();
-    const recovery = hasRecoveryInHash();
 
     const init = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       setUser(session?.user ?? null);
-      setIsRecovery(recovery);
       setLoading(false);
     };
 
@@ -382,105 +380,11 @@ export default function AccountPage() {
     return () => subscription.unsubscribe();
   }, []);
 
-  const handleSetPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    if (newPassword !== confirmPassword) {
-      setError('Passwords do not match.');
-      return;
-    }
-    if (newPassword.length < 6) {
-      setError('Password must be at least 6 characters.');
-      return;
-    }
-    setSubmitting(true);
-    try {
-      const supabase = createClient();
-      const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
-      if (updateError) {
-        setError(updateError.message);
-        return;
-      }
-      setSuccess(true);
-      setNewPassword('');
-      setConfirmPassword('');
-      window.history.replaceState(null, '', '/account');
-      setTimeout(() => {
-        window.location.href = '/dashboard';
-      }, 1500);
-    } catch {
-      setError('Something went wrong. Please try again.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-[#fdfcf0] flex flex-col items-center justify-center gap-4 p-6">
         <div className="w-10 h-10 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
         <p className="text-sm font-medium text-emerald-800">Loading…</p>
-      </div>
-    );
-  }
-
-  if (isRecovery && user) {
-    return (
-      <div className="min-h-screen bg-[#fdfcf0] flex flex-col items-center justify-center p-6">
-        <div className="glass rounded-3xl p-8 solarpunk-shadow max-w-md w-full">
-          <h1 className="text-xl font-bold text-emerald-950 mb-2">Set new password</h1>
-          <p className="text-sm text-emerald-800 mb-6">
-            Enter a new password for <span className="font-medium">{user.email}</span>
-          </p>
-          {success ? (
-            <p className="text-emerald-700">Password updated. Redirecting to dashboard…</p>
-          ) : (
-            <form onSubmit={handleSetPassword} className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-emerald-900">New password</label>
-                <input
-                  type="password"
-                  required
-                  minLength={6}
-                  className="w-full bg-white/70 border border-emerald-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-400"
-                  placeholder="Minimum 6 characters"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-emerald-900">Confirm password</label>
-                <input
-                  type="password"
-                  required
-                  minLength={6}
-                  className="w-full bg-white/70 border border-emerald-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-400"
-                  placeholder="Retype your password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                />
-              </div>
-              {error && (
-                <p className="text-xs text-rose-600 bg-rose-50 border border-rose-100 rounded-xl px-3 py-2">
-                  {error}
-                </p>
-              )}
-              <button
-                type="submit"
-                disabled={submitting}
-                className="w-full bg-emerald-600 text-white py-3 rounded-2xl font-semibold text-sm hover:bg-emerald-700 transition-colors disabled:opacity-60"
-              >
-                {submitting ? 'Saving…' : 'Save password'}
-              </button>
-            </form>
-          )}
-          <a
-            href="/dashboard"
-            className="mt-6 block text-center text-xs text-emerald-700 hover:text-emerald-900 underline"
-          >
-            Back to Dashboard
-          </a>
-        </div>
       </div>
     );
   }

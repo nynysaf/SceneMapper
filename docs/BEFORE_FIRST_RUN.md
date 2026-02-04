@@ -96,13 +96,32 @@ These are needed so Supabase can send users back to your app after actions like 
    - Production: `https://scenemapper.ca` (or your deployed URL)
 3. Under **Redirect URLs**, add these (one per line or comma‑separated, depending on the UI):
    - `http://localhost:3000/account`
+   - `http://localhost:3000/reset-password`
    - `http://localhost:3000/**`
    - `https://scenemapper.ca/account` (if using production)
+   - `https://scenemapper.ca/reset-password` (if using production)
    - `https://scenemapper.ca/**` (if using production)
 4. Replace `scenemapper.ca` with your actual domain if different.
 5. Save.
 
 **What `**` means:** It allows any path under that domain (e.g. `/maps/xyz`), which Supabase may use for some flows.
+
+### 3.4 (Optional) Custom SMTP — Send Auth Emails from Your Domain
+
+By default, Supabase sends auth emails (password reset, signup confirmation) from Supabase’s own servers. To send them from your domain (e.g. `noreply@scenemapper.ca`) via Resend:
+
+1. In Supabase: **Project Settings** → **Authentication** → **SMTP Settings**.
+2. Toggle **Enable Custom SMTP**.
+3. Use Resend SMTP credentials:
+   - **Host:** `smtp.resend.com`
+   - **Port:** `465`
+   - **Username:** `resend`
+   - **Password:** Your Resend API key (same one as `RESEND_API_KEY`)
+4. **Sender email:** e.g. `noreply@scenemapper.ca` (must be on a domain verified in Resend).
+5. **Sender name:** e.g. `Scene Mapper`
+6. Save.
+
+Your verified domain in Resend supports any address (e.g. `noreply@`, `invitations@`). No extra Resend setup needed.
 
 ---
 
@@ -354,7 +373,8 @@ Before considering setup complete, confirm:
 | Problem | What to check |
 |---------|----------------|
 | Signup fails | Supabase Email provider on, “Confirm email” off, anon key correct in `.env.local` |
-| Password reset link goes nowhere | Redirect URLs include `your-domain.com/account` |
+| Create account redirects to homepage but not signed in | 1) Supabase: Confirm email must be OFF. 2) Redeploy so signup uses the auth cookie fix. 3) DevTools → Application → Cookies: check for sb-* cookies after signup. |
+| Password reset link goes nowhere | Redirect URLs include `your-domain.com/reset-password` and `your-domain.com/account` |
 | “Unauthorized” on cron | `CRON_SECRET` set in Vercel and matches the one you send in the `Authorization` header |
 | Migration fails | `MIGRATION_SECRET` set, `public.users` exists, Supabase service role key is correct |
 | Invitation emails not sent | `RESEND_API_KEY` set, `RESEND_FROM_EMAIL` valid (or `onboarding@resend.dev` for testing) |

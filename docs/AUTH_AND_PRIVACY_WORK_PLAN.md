@@ -34,7 +34,7 @@
 - `POST /api/auth/login` — `supabase.auth.signInWithPassword({ email, password })`; set session cookie from Supabase session
 - `POST /api/auth/logout` — `supabase.auth.signOut()`; clear cookies
 - `GET /api/auth/session` — return current Supabase user (from cookie/session)
-- `POST /api/auth/forgot-password` — `supabase.auth.resetPasswordForEmail(email, { redirectTo })` — redirect to `{baseUrl}/account?reset=true`
+- `POST /api/auth/forgot-password` — `supabase.auth.resetPasswordForEmail(email, { redirectTo })` — redirect to `{baseUrl}/reset-password`
 
 ### 1.4 Session & User Resolution
 - Replace `getSession()` / session cookie with Supabase session (JWT in cookie via `@supabase/ssr`)
@@ -75,20 +75,14 @@
 - On click: show modal/popover asking for email, then call `POST /api/auth/forgot-password` with `{ email }`
 - Show success: "If an account exists, we've sent a reset link to that email."
 
-### 2.2 Reset Password Page / Pop-up
-- Supabase reset link goes to `{baseUrl}/account?reset=true&token_hash=...` (or use Supabase's built-in callback)
-- Supabase handles the token; we need a callback route: `GET /auth/callback` (or similar) that Supabase redirects to after reset
-- **Flow:** User clicks link in email → Supabase redirects to our callback → we exchange code for session → redirect to `/account` with `?reset=success`
-- On `/account`: if `?reset=success`, show a "Set new password" section (or modal) with:
-  - Email (read-only, populated from session)
-  - New password
-  - Confirm new password
-  - Save → `supabase.auth.updateUser({ password })` → redirect to `/dashboard`
-
-*Note: Supabase's default reset flow redirects to a URL we configure. We can set it to `/account?reset=success` and handle the token exchange in a dedicated route if needed. Check Supabase docs for exact flow.*
+### 2.2 Reset Password Page
+- **Done.** Dedicated `/reset-password` page.
+- Supabase reset link goes to `{baseUrl}/reset-password` (hash includes token)
+- **Flow:** User clicks link → lands on `/reset-password` → sees email (read-only), new password, confirm → Save → `updateUser({ password })` → redirect to `/`
+- Old `/account` links with recovery hash redirect to `/reset-password`
 
 ### 2.3 Auth Callback Route
-- `GET /auth/callback` — Next.js route that handles `code` from Supabase OAuth/email confirmation; exchanges for session; redirects to `/account` or `/dashboard`
+- Not needed for email reset; Supabase redirects directly to our URL with hash. OAuth would need this.
 
 ---
 
@@ -201,9 +195,9 @@
 ### 6.1 Remove Legacy Auth
 - Run user migration (1.8) before cutover
 - Remove `public.users` table if fully migrated (or keep for read-only reference)
-- Remove `/api/auth/login` old impl (replaced by Supabase)
-- Remove `/api/users` POST signup (replaced by `/api/auth/signup`)
-- Ensure `getUsers()` is no longer used for auth; remove or repurpose for admin-only user listing if needed
+- Remove `/api/auth/login` old impl (replaced by Supabase) — done
+- Remove `/api/users` POST signup (replaced by `/api/auth/signup`) — done
+- Ensure `getUsers()` is no longer used for auth — uses localStorage when backend off; Supabase Auth when backend on
 
 ### 6.2 Update All Session Consumers
 - `Dashboard`, `LandingPage`, `MapExperience`, `MapPage` — all use Supabase session
@@ -211,6 +205,7 @@
 - API routes that need user: use Supabase `getUser()` from cookie
 
 ### 6.3 Testing Checklist
+- See **`docs/TESTING_CHECKLIST.md`** for full checklist
 - [ ] Signup with password confirmation (mismatch rejected)
 - [ ] Login, logout (Supabase Auth)
 - [ ] Forgot password → email → reset → new password → login
@@ -240,9 +235,19 @@
 
 ---
 
+## Status: Phases 1–6 Complete
+
+All phases are implemented. Remaining items:
+
+- **Optional:** Supabase Custom SMTP (Resend) — send auth emails from your domain. See Supabase → Project Settings → Authentication → SMTP.
+- **Optional:** User migration (1.8) — only if you have legacy `public.users` to migrate.
+- **Ongoing:** Run `docs/TESTING_CHECKLIST.md` after deploys.
+
+---
+
 ## Resolved Decisions
 
 1. **Existing users migration:** Yes — create Supabase Auth users for each `public.users` row and send password reset email to each so they can set a new password and continue.
 2. **Email verification:** No — users can log in immediately after signup.
 3. **Daily digest timezone:** 4:59 UTC (≈11:59 PM ET) is acceptable.
-4. **Reset flow on /account:** Direct to `/account`. When user lands from reset link, they do NOT need to type current password — the link is the proof. Show "Set new password" + "Confirm new password" only; save via `updateUser({ password })`.
+4. **Reset flow:** Dedicated `/reset-password` page. User lands from reset link, no current password needed. Shows email (read-only), new password, confirm; save via `updateUser({ password })`; redirect to `/`.

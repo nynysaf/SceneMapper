@@ -3,11 +3,11 @@ import type { User } from '@/types';
 import { supabase } from '@/lib/supabase-server';
 import { dbUserToUser } from '@/lib/db-mappers';
 import { hashPassword } from '@/lib/password';
-import { setSessionCookieOnResponse } from '@/lib/session-cookie';
 
 /**
  * GET /api/users
- * Returns all users (for now; with auth you might return only current user).
+ * Returns users from public.users. Deprecated for auth: use Supabase Auth.
+ * Kept for local-only mode (NEXT_PUBLIC_USE_BACKEND=false) and potential admin tooling.
  */
 export async function GET() {
   try {
@@ -28,50 +28,9 @@ export async function GET() {
 }
 
 /**
- * POST /api/users
- * Signup: create user. Body: { name, email, password }. Returns created user and sets session cookie.
- */
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { name, email, password } = body;
-    if (!email || !password) {
-      return NextResponse.json({ error: 'email and password required' }, { status: 400 });
-    }
-
-    const password_hash = hashPassword(password);
-    const { data, error } = await supabase
-      .from('users')
-      .insert({ email, name: name ?? '', password_hash })
-      .select('id, email, name')
-      .single();
-
-    if (error) {
-      if (error.code === '23505') {
-        return NextResponse.json({ error: 'Email already registered' }, { status: 409 });
-      }
-      console.error('POST /api/users', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-    const user: User = {
-      id: data.id,
-      email: data.email,
-      name: data.name ?? '',
-      password: '',
-    };
-    const res = NextResponse.json({ ok: true, user });
-    setSessionCookieOnResponse(res, data.id);
-    return res;
-  } catch (err) {
-    console.error('POST /api/users', err);
-    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
-  }
-}
-
-/**
  * PUT /api/users
  * Replace all users (data layer contract). Body: User[] with plain passwords.
- * Hashes passwords and upserts. Used when NEXT_PUBLIC_USE_BACKEND and client calls saveUsers().
+ * Deprecated for auth. Kept for local-only mode when client calls saveUsers().
  */
 export async function PUT(request: NextRequest) {
   try {

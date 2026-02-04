@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClientForRouteHandler } from '@/lib/supabase/route-handler';
 import { getSupabase } from '@/lib/supabase-server';
 
 /**
@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Email and password required' }, { status: 400 });
     }
 
-    const supabase = await createClient();
+    const { supabase, setCookiesOnResponse } = await createClientForRouteHandler(request);
     const { data, error } = await supabase.auth.signUp({
       email: email.trim().toLowerCase(),
       password,
@@ -61,7 +61,9 @@ export async function POST(request: NextRequest) {
       email: user.email ?? '',
       name: user.user_metadata?.name ?? user.email ?? 'User',
     };
-    return NextResponse.json({ ok: true, user: session });
+    const response = NextResponse.json({ ok: true, user: session });
+    setCookiesOnResponse(response);
+    return response;
   } catch (err) {
     console.error('POST /api/auth/signup', err);
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });

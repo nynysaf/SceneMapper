@@ -4,15 +4,17 @@ import { supabase } from '@/lib/supabase-server';
 import { dbMapToSceneMap, sceneMapToDbMap } from '@/lib/db-mappers';
 import { hashPassword } from '@/lib/password';
 import { sendInvitationEmail } from '@/lib/invitation-email';
-import { getCurrentUserId } from '@/lib/auth-api';
+import { getCurrentUserIdFromRequest } from '@/lib/auth-api';
 
 /**
  * GET /api/maps
- * Returns maps the user can access: public maps plus maps where user is admin or collaborator.
+ * Returns maps for "Your Maps": only maps where the user is admin, collaborator, or has viewed.
+ * For non-logged-in users, returns public maps (for landing/explore). For logged-in users,
+ * returns only maps they have a relationship with.
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await getCurrentUserIdFromRequest(request);
     const { data, error } = await supabase.from('maps').select('*').order('created_at', { ascending: false });
     if (error) {
       console.error('GET /api/maps', error);
@@ -22,12 +24,18 @@ export async function GET() {
     if (!userId) {
       rows = rows.filter((r) => r.public_view === true);
     } else {
-      rows = rows.filter(
-        (r) =>
-          r.public_view === true ||
-          (Array.isArray(r.admin_ids) && r.admin_ids.includes(userId)) ||
-          (Array.isArray(r.collaborator_ids) && r.collaborator_ids.includes(userId)),
-      );
+      // Your Maps: only admin, collaborator, or has viewed
+      const { data: viewedRows } = await supabase
+        .from('user_map_views')
+        .select('map_id')
+        .eq('user_id', userId);
+      const viewedMapIds = new Set((viewedRows ?? []).map((r) => r.map_id));
+      rows = rows.filter((r) => {
+        const isAdmin = Array.isArray(r.admin_ids) && r.admin_ids.includes(userId);
+        const isCollaborator = Array.isArray(r.collaborator_ids) && r.collaborator_ids.includes(userId);
+        const hasViewed = viewedMapIds.has(r.id);
+        return isAdmin || isCollaborator || hasViewed;
+      });
     }
     const maps: SceneMap[] = rows.map(dbMapToSceneMap);
     return NextResponse.json(maps);
@@ -106,9 +114,6 @@ export async function POST(request: NextRequest) {
     // Send invitation emails to newly added addresses (only when Resend is configured)
     const fromEmail = process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev';
     const hasResendKey = !!process.env.RESEND_API_KEY;
-    if (!hasResendKey) {
-      console.warn('POST /api/maps: RESEND_API_KEY not set; skipping invitation emails');
-    }
     for (const m of maps) {
       const mapId = ensureUuid(m.id);
       const prev = existingById[mapId] ?? { invitedAdminEmails: [], invitedCollaboratorEmails: [] };
@@ -117,14 +122,6 @@ export async function POST(request: NextRequest) {
       const newAdminEmails = currentAdmins.filter((e) => !prev.invitedAdminEmails.includes(e));
       const newCollaboratorEmails = currentCollaborators.filter((e) => !prev.invitedCollaboratorEmails.includes(e));
 
-      if (newAdminEmails.length > 0 || newCollaboratorEmails.length > 0) {
-        console.log('POST /api/maps: invitation emails to send', {
-          mapSlug: m.slug,
-          newAdmins: newAdminEmails.length,
-          newCollaborators: newCollaboratorEmails.length,
-          hasResendKey,
-        });
-      }
       if (!hasResendKey) continue;
 
       for (const to of newAdminEmails) {
@@ -136,8 +133,6 @@ export async function POST(request: NextRequest) {
         });
         if ('error' in result) {
           console.error('Invitation email (admin)', to, result.error);
-        } else {
-          console.log('Invitation email sent (admin)', to);
         }
       }
       for (const to of newCollaboratorEmails) {
@@ -149,8 +144,6 @@ export async function POST(request: NextRequest) {
         });
         if ('error' in result) {
           console.error('Invitation email (collaborator)', to, result.error);
-        } else {
-          console.log('Invitation email sent (collaborator)', to);
         }
       }
     }

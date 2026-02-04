@@ -1,6 +1,7 @@
 import React from 'react';
 import { MapNode, MapConnection, MapTheme } from '../types';
-import { X, Check, Trash2, Clock, MapPin, GitBranch } from 'lucide-react';
+import { NODE_TYPE_LABELS } from '../constants';
+import { X, Check, Trash2, Clock, MapPin, GitBranch, Pencil } from 'lucide-react';
 
 interface AdminReviewModalProps {
   pendingNodes: MapNode[];
@@ -10,6 +11,8 @@ interface AdminReviewModalProps {
   onDeny: (id: string) => void;
   onApproveConnection?: (id: string) => void;
   onDenyConnection?: (id: string) => void;
+  /** Called when admin clicks Edit on a pending node; opens edit flow, then approve/deny */
+  onEditNode?: (node: MapNode) => void;
   mapTheme?: MapTheme;
   /** Nodes used to resolve connection from/to titles */
   nodes?: MapNode[];
@@ -23,6 +26,7 @@ const AdminReviewModal: React.FC<AdminReviewModalProps> = ({
   onDeny,
   onApproveConnection,
   onDenyConnection,
+  onEditNode,
   mapTheme,
   nodes = [],
 }) => {
@@ -76,7 +80,7 @@ const AdminReviewModal: React.FC<AdminReviewModalProps> = ({
                           backgroundColor: categoryColors?.[node.type] ?? '#059669',
                         }}
                       >
-                        {node.type}
+                        {NODE_TYPE_LABELS[node.type] ?? node.type}
                       </span>
                       <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
                         <MapPin size={10} />
@@ -99,6 +103,18 @@ const AdminReviewModal: React.FC<AdminReviewModalProps> = ({
                   </div>
                   
                   <div className="flex flex-col gap-2 shrink-0">
+                    {onEditNode && (
+                      <button
+                        onClick={() => {
+                          onEditNode(node);
+                          onClose();
+                        }}
+                        className="bg-amber-50 text-amber-700 p-3 rounded-2xl hover:bg-amber-100 transition-all flex items-center justify-center border border-amber-200"
+                        title="Edit"
+                      >
+                        <Pencil size={24} />
+                      </button>
+                    )}
                     <button 
                       onClick={() => onApprove(node.id)}
                       className="bg-emerald-600 text-white p-3 rounded-2xl hover:bg-emerald-700 transition-all flex items-center justify-center solarpunk-shadow group"

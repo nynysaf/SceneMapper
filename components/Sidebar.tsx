@@ -1,7 +1,8 @@
 
 import React from 'react';
 import { NodeType, MapNode, MapTheme } from '../types';
-import { X, ExternalLink, Calendar, MapPin, User, Building, Leaf, Globe, Pencil, Trash2, Settings2, Link2, QrCode, Download, Plus, FileDown } from 'lucide-react';
+import { NODE_TYPE_LABELS } from '../constants';
+import { X, ExternalLink, Calendar, MapPin, User, Building, Leaf, Globe, Pencil, Trash2, Settings2, Link2, QrCode, Download, Plus, FileDown, Check, Image } from 'lucide-react';
 
 /** Squiggly/curved line icon for connection filter (20px, matches other filter icons). */
 function ConnectionLineIcon({ size = 20, className }: { size?: number; className?: string }) {
@@ -22,7 +23,8 @@ interface SidebarProps {
   /** When true, connection lines are shown on the map. */
   connectionsFilterOn: boolean;
   onConnectionsFilterToggle: () => void;
-  selectedNode: MapNode | null;
+  /** Single node when exactly one selected; for multi-select, pass full array and we show count. */
+  selectedNodes: MapNode[];
   onClearSelection: () => void;
   userRole: string;
   mapTheme?: MapTheme;
@@ -34,6 +36,8 @@ interface SidebarProps {
   isNodePopupOpen?: boolean;
   /** Current map slug for share (copy link / QR). When set, shows Share section in filter view. */
   mapSlug?: string;
+  /** Map title for QR download filename. */
+  mapTitle?: string;
   /** Node size scale (e.g. 0.5–2). Admin only. */
   nodeSizeScale?: number;
   /** Called when admin changes node size. Admin only. */
@@ -63,7 +67,7 @@ function Sidebar({
   connectionsEnabled = true,
   connectionsFilterOn,
   onConnectionsFilterToggle,
-  selectedNode,
+  selectedNodes,
   onClearSelection,
   userRole,
   mapTheme,
@@ -83,11 +87,13 @@ function Sidebar({
   onDownloadRequested,
   onExportRequested,
   onAddNode,
+  mapTitle,
 }: SidebarProps) {
   const categoryColors = mapTheme?.categoryColors;
   const [isCollapsed, setIsCollapsed] = React.useState(false);
   const [showDownloadModal, setShowDownloadModal] = React.useState(false);
   const [showExportModal, setShowExportModal] = React.useState(false);
+  const [showSaveConfirmation, setShowSaveConfirmation] = React.useState(false);
   React.useEffect(() => {
     onCollapsedChange?.(isCollapsed);
   }, [isCollapsed, onCollapsedChange]);
@@ -99,6 +105,7 @@ function Sidebar({
   // }, [selectedNode]);
   const [linkCopied, setLinkCopied] = React.useState(false);
   const [showQR, setShowQR] = React.useState(false);
+  const qrImgRef = React.useRef<HTMLImageElement | null>(null);
   // Set shareUrl only after mount so server and first client render match (avoids hydration error)
   const [shareUrl, setShareUrl] = React.useState('');
   const [mounted, setMounted] = React.useState(false);
@@ -120,8 +127,9 @@ function Sidebar({
     { type: NodeType.EVENT, label: 'Events', icon: Calendar },
     { type: NodeType.PERSON, label: 'People', icon: User },
     { type: NodeType.SPACE, label: 'Spaces', icon: Building },
-    { type: NodeType.COMMUNITY, label: 'Communities', icon: Leaf },
+    { type: NodeType.COMMUNITY, label: 'Groups', icon: Leaf },
     { type: NodeType.REGION, label: 'Regions', icon: Globe },
+    { type: NodeType.MEDIA, label: 'Media', icon: Image },
   ];
   const filterOptions = (enabledNodeTypes
     ? allFilterOptions.filter((o) => enabledNodeTypes.includes(o.type))
@@ -133,8 +141,9 @@ function Sidebar({
   return (
     <>
       {/* Panel + Handle — whole thing slides; handle on left, stays visible when collapsed */}
+      {/* z-[60] when node popup open so Edit/Delete clicks hit Sidebar, not the popup's backdrop (z-[59]) */}
       <div
-        className="fixed top-0 right-0 h-full z-50 flex flex-row pointer-events-none"
+        className={`fixed top-0 right-0 h-full flex flex-row pointer-events-none ${isNodePopupOpen ? 'z-[60]' : 'z-50'}`}
       >
         <div
           className={`h-full flex flex-row pointer-events-auto transform transition-transform duration-300 ${
@@ -153,7 +162,7 @@ function Sidebar({
             <div className="w-1.5 h-12 rounded-full bg-emerald-500" />
           </button>
           <div className="h-full flex flex-col p-6 overflow-y-auto pt-12 md:pt-6 glass shadow-2xl flex-1 w-[90vw] max-w-sm md:w-80">
-        {selectedNode ? (
+        {selectedNodes.length > 0 ? (
           <div className="flex flex-col gap-4 relative">
             {userRole === 'admin' && onEditMapSettings && !isNodePopupOpen && (
               <button
@@ -165,92 +174,121 @@ function Sidebar({
                 <Settings2 size={20} />
               </button>
             )}
-            <div className="flex justify-between items-start gap-2">
-              <span 
-                className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest text-white"
-                style={{
-                  backgroundColor:
-                    categoryColors?.[selectedNode.type] ?? '#059669',
-                }}
-              >
-                {selectedNode.type}
-              </span>
-              {selectedNode.status === 'pending' && (
-                <span className="ml-2 px-2 py-1 rounded-full text-[9px] font-semibold uppercase tracking-widest bg-amber-50 text-amber-800 border border-amber-200">
-                  Pending approval
-                </span>
-              )}
-              <div className="flex items-center gap-1">
-                {userRole !== 'public' && onEditNode && (
+            {selectedNodes.length > 1 ? (
+              <>
+                <div className="flex justify-between items-center gap-2">
+                  <span className="text-lg font-bold text-emerald-950">
+                    {selectedNodes.length} nodes selected
+                  </span>
                   <button
-                    onClick={() => onEditNode(selectedNode)}
+                    onClick={onClearSelection}
                     className="text-emerald-800 hover:bg-emerald-100 p-1 rounded-full transition-colors"
-                    title="Edit node"
+                    title="Clear selection"
                   >
-                    <Pencil size={16} />
+                    <X size={20} />
                   </button>
-                )}
-                {userRole === 'admin' && onRequestDeleteNode && (
-                  <button
-                    onClick={() => onRequestDeleteNode(selectedNode)}
-                    className="text-rose-700 hover:bg-rose-50 p-1 rounded-full transition-colors"
-                    title="Delete node"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                )}
-                <button
-                  onClick={onClearSelection}
-                  className="text-emerald-800 hover:bg-emerald-100 p-1 rounded-full transition-colors"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-            </div>
-            
-            <h2 className="text-3xl font-bold text-emerald-950 leading-tight">
-              {selectedNode.title}
-            </h2>
-            
-            <p className="text-emerald-800 leading-relaxed font-light">
-              {selectedNode.description}
-            </p>
+                </div>
+                <p className="text-sm text-emerald-700">
+                  Drag any selected node to reposition all of them together.
+                </p>
+              </>
+            ) : (
+              <>
+                {(() => {
+                  const selectedNode = selectedNodes[0];
+                  return (
+                    <>
+                      <div className="flex justify-between items-start gap-2">
+                        <span 
+                          className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest text-white"
+                          style={{
+                            backgroundColor:
+                              categoryColors?.[selectedNode.type] ?? '#059669',
+                          }}
+                        >
+                          {NODE_TYPE_LABELS[selectedNode.type] ?? selectedNode.type}
+                        </span>
+                        {selectedNode.status === 'pending' && (
+                          <span className="ml-2 px-2 py-1 rounded-full text-[9px] font-semibold uppercase tracking-widest bg-amber-50 text-amber-800 border border-amber-200">
+                            Pending approval
+                          </span>
+                        )}
+                        <div className="flex items-center gap-1">
+                          {userRole !== 'public' && onEditNode && (
+                            <button
+                              onClick={() => onEditNode(selectedNode)}
+                              className="text-emerald-800 hover:bg-emerald-100 p-1 rounded-full transition-colors"
+                              title="Edit node"
+                            >
+                              <Pencil size={16} />
+                            </button>
+                          )}
+                          {userRole === 'admin' && onRequestDeleteNode && (
+                            <button
+                              onClick={() => onRequestDeleteNode(selectedNode)}
+                              className="text-rose-700 hover:bg-rose-50 p-1 rounded-full transition-colors"
+                              title="Delete node"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                          <button
+                            onClick={onClearSelection}
+                            className="text-emerald-800 hover:bg-emerald-100 p-1 rounded-full transition-colors"
+                          >
+                            <X size={20} />
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <h2 className="text-3xl font-bold text-emerald-950 leading-tight">
+                        {selectedNode.title}
+                      </h2>
+                      
+                      <p className="text-emerald-800 leading-relaxed font-light whitespace-pre-line">
+                        {selectedNode.description}
+                      </p>
 
-            {selectedNode.website && (
-              <div className="flex items-center gap-2 text-emerald-600 text-sm font-semibold">
-                <ExternalLink size={16} />
-                <a href={selectedNode.website} target="_blank" rel="noopener noreferrer" className="hover:underline break-all">
-                  {selectedNode.website.replace(/^https?:\/\//, '')}
-                </a>
-              </div>
+                      {selectedNode.website && (
+                        <div className="flex items-center gap-2 text-emerald-600 text-sm font-semibold">
+                          <ExternalLink size={16} />
+                          <a href={selectedNode.website} target="_blank" rel="noopener noreferrer" className="hover:underline break-all">
+                            {selectedNode.website.replace(/^https?:\/\//, '')}
+                          </a>
+                        </div>
+                      )}
+
+                      {false && selectedNode.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-4">
+                        {selectedNode.tags.map(tag => (
+                          <span key={tag} className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-lg text-xs font-medium border border-emerald-100">
+                            #{tag}
+                          </span>
+                        ))}
+                      </div>
+                      )}
+
+                      <div className="mt-8 pt-8 border-t border-emerald-100 space-y-4">
+                        <div className="flex items-center gap-3 text-emerald-900">
+                          <User size={18} className="text-emerald-600" />
+                          <span className="text-sm">Added by: {selectedNode.collaboratorId}</span>
+                        </div>
+                        {selectedNode.website && (
+                          <a 
+                            href={selectedNode.website}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="w-full bg-emerald-100 text-emerald-800 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-emerald-200 transition-colors"
+                          >
+                            Visit link <ExternalLink size={14} />
+                          </a>
+                        )}
+                      </div>
+                    </>
+                  );
+                })()}
+              </>
             )}
-
-            {false && selectedNode.tags.length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-4">
-              {selectedNode.tags.map(tag => (
-                <span key={tag} className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-lg text-xs font-medium border border-emerald-100">
-                  #{tag}
-                </span>
-              ))}
-            </div>
-            )}
-
-            <div className="mt-8 pt-8 border-t border-emerald-100 space-y-4">
-              <div className="flex items-center gap-3 text-emerald-900">
-                <User size={18} className="text-emerald-600" />
-                <span className="text-sm">Added by: {selectedNode.collaboratorId}</span>
-              </div>
-              {selectedNode.website && (
-                <a 
-                  href={selectedNode.website}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full bg-emerald-100 text-emerald-800 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-emerald-200 transition-colors"
-                >
-                  Visit Digitally <ExternalLink size={14} />
-                </a>
-              )}
-            </div>
           </div>
         ) : (
           <div className="space-y-8">
@@ -344,7 +382,7 @@ function Sidebar({
             </div>
 
             {userRole === 'admin' && onEditMapSettings && !isNodePopupOpen && (
-              <div className="flex justify-center">
+              <div className="flex justify-center gap-2 flex-wrap">
                 <button
                   type="button"
                   onClick={onEditMapSettings}
@@ -353,6 +391,21 @@ function Sidebar({
                 >
                   <Settings2 size={18} />
                   Edit map settings
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSaveConfirmation(true);
+                    import('canvas-confetti').then(({ default: confetti }) => {
+                      confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
+                    });
+                    setTimeout(() => setShowSaveConfirmation(false), 2000);
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white shadow hover:bg-emerald-700 text-sm font-medium"
+                  title="Save (changes save automatically)"
+                >
+                  <Check size={18} />
+                  Save
                 </button>
               </div>
             )}
@@ -490,17 +543,56 @@ function Sidebar({
         >
           <p className="text-sm font-semibold text-emerald-900">Scan to open map</p>
           <img
-            src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(shareUrl)}`}
+            ref={qrImgRef}
+            src={`/api/qr?data=${encodeURIComponent(shareUrl)}&size=200`}
             alt="QR code for map"
             className="rounded-lg"
           />
-          <button
-            type="button"
-            onClick={() => setShowQR(false)}
-            className="text-sm font-medium text-emerald-800 px-4 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100"
-          >
-            Close
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={async () => {
+                const img = qrImgRef.current;
+                if (!img) return;
+                const safeTitle = (mapTitle || 'map').replace(/[\s\\/:*?"<>|]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || 'map';
+                const canvas = document.createElement('canvas');
+                const qrSize = 200;
+                const padding = 24;
+                const titleHeight = 40;
+                canvas.width = qrSize + padding * 2;
+                canvas.height = qrSize + padding * 2 + titleHeight;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return;
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                try {
+                  ctx.drawImage(img, padding, padding, qrSize, qrSize);
+                  ctx.fillStyle = '#064e3b';
+                  ctx.font = 'bold 18px system-ui, sans-serif';
+                  ctx.textAlign = 'center';
+                  ctx.fillText(mapTitle || 'Map', canvas.width / 2, qrSize + padding + 28);
+                  const link = document.createElement('a');
+                  link.download = `${safeTitle}-qr.png`;
+                  link.href = canvas.toDataURL('image/png');
+                  link.click();
+                } catch {
+                  // CORS may block; fallback: open QR in new tab for manual save
+                  window.open(img.src, '_blank');
+                }
+              }}
+              className="flex items-center gap-2 text-sm font-medium text-emerald-800 px-4 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100"
+            >
+              <Download size={16} />
+              Download
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowQR(false)}
+              className="text-sm font-medium text-emerald-800 px-4 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100"
+            >
+              Close
+            </button>
+          </div>
         </div>
       </div>
       )}
@@ -556,6 +648,17 @@ function Sidebar({
           </button>
         </div>
       </div>
+      )}
+
+      {showSaveConfirmation && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center pointer-events-none">
+          <div className="glass px-8 py-6 rounded-2xl solarpunk-shadow animate-in fade-in zoom-in duration-200">
+            <p className="text-lg font-bold text-emerald-900 flex items-center gap-2">
+              <Check size={24} className="text-emerald-600" />
+              All changes saved
+            </p>
+          </div>
+        </div>
       )}
 
       {showExportModal && onExportRequested && (

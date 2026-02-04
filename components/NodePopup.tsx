@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { MapNode, MapTheme } from '../types';
+import { NODE_TYPE_LABELS } from '../constants';
 import { X, ExternalLink, ScrollText, Pencil, Trash2 } from 'lucide-react';
 
 interface NodePopupProps {
@@ -57,7 +58,7 @@ const NodePopup: React.FC<NodePopupProps> = ({
               }}
             />
             <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-800">
-              {node.type}
+              {NODE_TYPE_LABELS[node.type] ?? node.type}
             </span>
             {node.status === 'pending' && (
               <span className="ml-2 px-2 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-widest bg-amber-50 text-amber-800 border border-amber-200">
@@ -115,7 +116,7 @@ const NodePopup: React.FC<NodePopupProps> = ({
                   rel="noopener noreferrer"
                   className="bg-emerald-600 text-white py-3 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 hover:bg-emerald-700 transition-all solarpunk-shadow group shadow-lg"
                 >
-                  Visit Official Site
+                  Visit link
                   <ExternalLink size={14} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
                 </a>
               )}

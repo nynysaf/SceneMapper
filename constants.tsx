@@ -46,4 +46,23 @@ export const CATEGORY_COLORS: Record<NodeType, string> = {
   [NodeType.SPACE]: '#8BA888', // Sage Green
   [NodeType.COMMUNITY]: '#3498DB', // Sky Blue
   [NodeType.REGION]: '#4a5568', // Slate (text only, no dot)
+  [NodeType.MEDIA]: '#9B59B6', // Purple
 };
+
+/** Display labels for node types (Communities → Groups, Community → Group) */
+export const NODE_TYPE_LABELS: Record<NodeType, string> = {
+  [NodeType.EVENT]: 'Events',
+  [NodeType.PERSON]: 'People',
+  [NodeType.SPACE]: 'Spaces',
+  [NodeType.COMMUNITY]: 'Groups',
+  [NodeType.REGION]: 'Regions',
+  [NodeType.MEDIA]: 'Media',
+};
+
+/** Default enabled node types for new maps (excludes Person and Media per plan) */
+export const DEFAULT_ENABLED_NODE_TYPES: NodeType[] = [
+  NodeType.EVENT,
+  NodeType.SPACE,
+  NodeType.COMMUNITY,
+  NodeType.REGION,
+];

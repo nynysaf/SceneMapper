@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = await createClient();
-    const redirectTo = `${getBaseUrl()}/account`;
+    const redirectTo = `${getBaseUrl()}/reset-password`;
     await supabase.auth.resetPasswordForEmail(email.toLowerCase(), { redirectTo });
 
     return NextResponse.json({ ok: true, message: 'If an account exists, we\'ve sent a reset link to that email.' });

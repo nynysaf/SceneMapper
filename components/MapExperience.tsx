@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { MapNode, MapConnection, NodeType, UserSession, MapTheme, SceneMap, User, AuthSession } from '../types';
-import { INITIAL_NODES, CATEGORY_COLORS } from '../constants';
+import { INITIAL_NODES, CATEGORY_COLORS, DEFAULT_ENABLED_NODE_TYPES, NODE_TYPE_LABELS } from '../constants';
 import { getNodes as loadNodes, saveNodes as persistNodes, getConnections as loadConnections, saveConnections as persistConnections, getSession, getMaps, saveMaps, isAbortError } from '../lib/data';
 import Map from './Map';
 import Sidebar from './Sidebar';
@@ -99,7 +99,7 @@ const MapExperience: React.FC<MapExperienceProps> = ({
   const [submissionPresetKind, setSubmissionPresetKind] = useState<NodeType | 'CONNECTION' | null>(null);
   const [isAdminReviewOpen, setIsAdminReviewOpen] = useState(false);
   const [pendingNode, setPendingNode] = useState<Partial<MapNode> | null>(null);
-  const [selectedNode, setSelectedNode] = useState<MapNode | null>(null);
+  const [selectedNodes, setSelectedNodes] = useState<MapNode[]>([]);
   const [popupAnchor, setPopupAnchor] = useState<{ x: number; y: number } | null>(null);
   const [hasCollaboratorPassword, setHasCollaboratorPassword] = useState(false);
   const [isJoinOpen, setIsJoinOpen] = useState(false);
@@ -116,7 +116,7 @@ const MapExperience: React.FC<MapExperienceProps> = ({
   const [nodeLabelFontScale, setNodeLabelFontScale] = useState(1);
   const [regionFontScale, setRegionFontScale] = useState(1);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [enabledNodeTypes, setEnabledNodeTypes] = useState<NodeType[]>(() => Object.values(NodeType));
+  const [enabledNodeTypes, setEnabledNodeTypes] = useState<NodeType[]>(() => DEFAULT_ENABLED_NODE_TYPES);
   const [connectionsEnabled, setConnectionsEnabled] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [exportFormat, setExportFormat] = useState<'jpeg' | 'png' | 'pdf' | null>(null);
@@ -149,7 +149,7 @@ const MapExperience: React.FC<MapExperienceProps> = ({
       const enabled =
         map.enabledNodeTypes && map.enabledNodeTypes.length > 0
           ? map.enabledNodeTypes
-          : Object.values(NodeType);
+          : DEFAULT_ENABLED_NODE_TYPES;
       setEnabledNodeTypes(enabled);
       setConnectionsEnabled(map.connectionsEnabled !== false);
       setActiveFilters((prev) => prev.filter((t) => enabled.includes(t)));
@@ -305,23 +305,59 @@ const MapExperience: React.FC<MapExperienceProps> = ({
     saveNodes(updatedNodes);
   };
 
-  // Handles clicking a node to show details
-  const handleNodeSelect = (node: MapNode, screenPos: { x: number; y: number }) => {
-    if (selectedNode?.id === node.id) {
-      setSelectedNode(null);
-      setPopupAnchor(null);
+  // Bulk repositioning when multiple nodes are selected and dragged
+  const handleNodesMove = useCallback(
+    (updates: { id: string; x: number; y: number }[]) => {
+      const byId = Object.fromEntries(updates.map((u) => [u.id, u]));
+      const updatedNodes = nodes.map((node) => {
+        const u = byId[node.id] as { x: number; y: number } | undefined;
+        return u ? { ...node, x: u.x, y: u.y } : node;
+      });
+      saveNodes(updatedNodes);
+    },
+    [nodes, saveNodes],
+  );
+
+  const handleMapBackgroundClick = useCallback(() => {
+    setSelectedNodes([]);
+    setPopupAnchor(null);
+  }, []);
+
+  // Handles clicking a node: single select (popup) or Shift+Click for multi-select
+  const handleNodeSelect = (node: MapNode, screenPos: { x: number; y: number }, opts?: { shiftKey?: boolean }) => {
+    if (opts?.shiftKey && userSession.role !== 'public') {
+      // Multi-select: add/remove from selection
+      setSelectedNodes((prev) => {
+        const idx = prev.findIndex((n) => n.id === node.id);
+        if (idx >= 0) {
+          const next = prev.filter((n) => n.id !== node.id);
+          setPopupAnchor(null); // No popup when transitioning from multi-select
+          return next;
+        }
+        const next = [...prev, node];
+        setPopupAnchor(null); // No popup for multi-select
+        return next;
+      });
     } else {
-      setSelectedNode(node);
-      setPopupAnchor(screenPos);
+      // Single select
+      if (selectedNodes.length === 1 && selectedNodes[0].id === node.id) {
+        setSelectedNodes([]);
+        setPopupAnchor(null);
+      } else {
+        setSelectedNodes([node]);
+        setPopupAnchor(screenPos);
+      }
     }
   };
+
+  const selectedNode = selectedNodes.length === 1 ? selectedNodes[0] : null;
 
   // Initiates the two-step placement process (Form -> Map Click)
   const startPlacement = (nodeData: Partial<MapNode>) => {
     setPendingNode(nodeData);
     setIsSubmissionOpen(false);
     setSubmissionPresetKind(null);
-    setSelectedNode(null);
+    setSelectedNodes([]);
     setPopupAnchor(null);
   };
 
@@ -343,7 +379,7 @@ const MapExperience: React.FC<MapExperienceProps> = ({
   );
 
   // Finalizes node creation upon map click
-  const handleMapClick = (x: number, y: number) => {
+  const handleMapClick = (x: number, y: number, ev?: { clientX: number; clientY: number }) => {
     if (pendingNode) {
       const node: MapNode = {
         id: crypto.randomUUID(),
@@ -362,6 +398,14 @@ const MapExperience: React.FC<MapExperienceProps> = ({
       const newNodes = [...nodes, node];
       saveNodes(newNodes);
       setPendingNode(null);
+
+      // Confetti from node position (fades within ~2s)
+      if (typeof window !== 'undefined' && ev) {
+        import('canvas-confetti').then(({ default: confetti }) => {
+          const origin = { x: ev.clientX / window.innerWidth, y: ev.clientY / window.innerHeight };
+          confetti({ origin, particleCount: 50, spread: 60, startVelocity: 30, decay: 0.9 });
+        });
+      }
     }
   };
 
@@ -377,8 +421,8 @@ const MapExperience: React.FC<MapExperienceProps> = ({
   const handleDeny = (id: string) => {
     const updatedNodes = nodes.filter((node) => node.id !== id);
     saveNodes(updatedNodes);
-    if (selectedNode?.id === id) {
-      setSelectedNode(null);
+    if (selectedNodes.some((n) => n.id === id)) {
+      setSelectedNodes((prev) => prev.filter((n) => n.id !== id));
       setPopupAnchor(null);
     }
   };
@@ -443,6 +487,8 @@ const MapExperience: React.FC<MapExperienceProps> = ({
       mapTheme?.categoryColors?.[NodeType.COMMUNITY] ?? CATEGORY_COLORS[NodeType.COMMUNITY],
     [NodeType.REGION]:
       mapTheme?.categoryColors?.[NodeType.REGION] ?? CATEGORY_COLORS[NodeType.REGION],
+    [NodeType.MEDIA]:
+      mapTheme?.categoryColors?.[NodeType.MEDIA] ?? CATEGORY_COLORS[NodeType.MEDIA],
   };
 
   const filteredNodes = nodes.filter((n) => {
@@ -684,7 +730,7 @@ const MapExperience: React.FC<MapExperienceProps> = ({
   };
 
   const startEditNode = (node: MapNode) => {
-    setSelectedNode(node);
+    setSelectedNodes([node]);
     setEditTitle(node.title);
     setEditDescription(node.description);
     setEditWebsite(node.website || '');
@@ -708,12 +754,12 @@ const MapExperience: React.FC<MapExperienceProps> = ({
     );
     saveNodes(updatedNodes);
     const updated = updatedNodes.find((n) => n.id === selectedNode.id) || selectedNode;
-    setSelectedNode(updated);
+    setSelectedNodes([updated]);
     setIsEditOpen(false);
   };
 
   const requestDeleteNode = (node: MapNode) => {
-    setSelectedNode(node);
+    setSelectedNodes([node]);
     setIsDeleteConfirmOpen(true);
   };
 
@@ -721,16 +767,21 @@ const MapExperience: React.FC<MapExperienceProps> = ({
     if (!selectedNode) return;
     const updatedNodes = nodes.filter((n) => n.id !== selectedNode.id);
     saveNodes(updatedNodes);
-    setSelectedNode(null);
+    setSelectedNodes([]);
     setPopupAnchor(null);
     setIsDeleteConfirmOpen(false);
     setIsEditOpen(false);
   };
 
+  // Persist last known title so it doesn't disappear on mobile when map area is panned/left
+  const lastTitleRef = useRef(mapTitle ?? '');
+  if (mapTitle) lastTitleRef.current = mapTitle;
+  const displayTitle = mapTitle || lastTitleRef.current;
+
   return (
     <div className="relative w-screen h-screen overflow-hidden flex flex-col">
-      {/* --- Top: map card + role card only (no full-width bar) --- */}
-      <header className="absolute top-0 left-0 right-0 z-50 pointer-events-none pt-[max(env(safe-area-inset-top),0.75rem)] px-3 md:px-4 flex justify-between items-start">
+      {/* --- Top: map card + role card — fixed, z-[65] so permission button stays above sidebar when expanded --- */}
+      <header className="fixed top-0 left-0 right-0 z-[65] pointer-events-none pt-[max(env(safe-area-inset-top),0.75rem)] px-3 md:px-4 flex justify-between items-start">
         {/* Map card — top-left */}
         <div className="pointer-events-auto glass p-2 md:p-3 rounded-xl md:rounded-2xl solarpunk-shadow flex items-center gap-2 md:gap-3 min-w-0">
             <div
@@ -742,11 +793,11 @@ const MapExperience: React.FC<MapExperienceProps> = ({
               ) : map?.icon ? (
                 <span className="text-base md:text-lg">{map.icon}</span>
               ) : (
-                mapTitle.split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase().slice(0, 2) || '?'
+                displayTitle.split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase().slice(0, 2) || '?'
               )}
             </div>
             <div className="min-w-0">
-              <h1 className="text-base md:text-xl font-bold text-emerald-900 leading-tight truncate">{mapTitle}</h1>
+              <h1 className="text-base md:text-xl font-bold text-emerald-900 leading-tight truncate">{displayTitle}</h1>
               <Link
                 href="/"
                 className="text-[10px] md:text-xs text-emerald-700 font-medium hover:text-emerald-900 hover:underline"
@@ -780,7 +831,7 @@ const MapExperience: React.FC<MapExperienceProps> = ({
             ) : (
               <Info size={16} className="md:w-[18px] md:h-[18px]" />
             )}
-            <span className="hidden sm:inline">{userSession.role.charAt(0).toUpperCase() + userSession.role.slice(1)}</span>
+            <span>{userSession.role.charAt(0).toUpperCase() + userSession.role.slice(1)}</span>
           </button>
           {userSession.role === 'admin' && pendingReviewCount > 0 && (
             <button
@@ -934,6 +985,9 @@ const MapExperience: React.FC<MapExperienceProps> = ({
           onNodeMove={handleNodeMove}
           onNodeSelect={handleNodeSelect}
           onMapClick={handleMapClick}
+          selectedNodeIds={selectedNodes.map((n) => n.id)}
+          onNodesMove={userSession.role !== 'public' ? handleNodesMove : undefined}
+          onMapBackgroundClick={handleMapBackgroundClick}
           isEditable={userSession.role !== 'public'}
           isPlacing={!!pendingNode}
           backgroundImageUrl={mapBackgroundImageUrl}
@@ -964,7 +1018,7 @@ const MapExperience: React.FC<MapExperienceProps> = ({
             <div
               className="fixed inset-0 z-[59]"
               onClick={() => {
-                setSelectedNode(null);
+                setSelectedNodes([]);
                 setPopupAnchor(null);
               }}
               aria-hidden="true"
@@ -973,7 +1027,7 @@ const MapExperience: React.FC<MapExperienceProps> = ({
             node={selectedNode}
             anchor={popupAnchor}
             onClose={() => {
-              setSelectedNode(null);
+              setSelectedNodes([]);
               setPopupAnchor(null);
             }}
             mapTheme={mapTheme}
@@ -1022,9 +1076,9 @@ const MapExperience: React.FC<MapExperienceProps> = ({
         connectionsEnabled={connectionsEnabled}
         connectionsFilterOn={connectionsFilterOn}
         onConnectionsFilterToggle={() => setConnectionsFilterOn((v) => !v)}
-        selectedNode={selectedNode}
+        selectedNodes={selectedNodes}
         onClearSelection={() => {
-          setSelectedNode(null);
+          setSelectedNodes([]);
           setPopupAnchor(null);
         }}
         userRole={userSession.role}
@@ -1032,8 +1086,9 @@ const MapExperience: React.FC<MapExperienceProps> = ({
         mapDescription={mapDescription}
         onEditNode={userSession.role === 'public' ? undefined : startEditNode}
         onRequestDeleteNode={userSession.role === 'admin' ? requestDeleteNode : undefined}
-        isNodePopupOpen={!!(selectedNode && popupAnchor)}
+        isNodePopupOpen={!!(selectedNodes.length === 1 && popupAnchor)}
         mapSlug={effectiveSlug}
+        mapTitle={mapTitle}
         nodeSizeScale={nodeSizeScale}
         onNodeSizeScaleChange={userSession.role === 'admin' ? persistNodeSizeScale : undefined}
         nodeLabelFontScale={nodeLabelFontScale}
@@ -1093,6 +1148,10 @@ const MapExperience: React.FC<MapExperienceProps> = ({
           onDeny={handleDeny}
           onApproveConnection={handleApproveConnection}
           onDenyConnection={handleDenyConnection}
+          onEditNode={(node) => {
+            startEditNode(node);
+            setIsAdminReviewOpen(false);
+          }}
           mapTheme={mapTheme}
           nodes={nodes}
         />

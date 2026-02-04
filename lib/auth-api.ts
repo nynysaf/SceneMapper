@@ -1,10 +1,23 @@
 /**
  * Helpers for auth in API routes.
  */
+import type { NextRequest } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createClientForRouteHandler } from '@/lib/supabase/route-handler';
 
 export async function getCurrentUserId(): Promise<string | null> {
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  return user?.id ?? null;
+}
+
+/**
+ * Use in Route Handlers for reliable session reads.
+ * cookies() from next/headers can miss session in some Route Handler contexts;
+ * passing the request ensures cookies are read from the incoming request.
+ */
+export async function getCurrentUserIdFromRequest(request: NextRequest): Promise<string | null> {
+  const { supabase } = await createClientForRouteHandler(request);
   const { data: { user } } = await supabase.auth.getUser();
   return user?.id ?? null;
 }

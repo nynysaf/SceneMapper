@@ -87,6 +87,21 @@ async function saveMapsApi(maps: SceneMap[]): Promise<void> {
   }
 }
 
+/** Records that the current user has viewed this map (for Your Maps filtering). No-op when not using backend or not logged in. */
+export async function recordMapView(mapSlug: string, options?: DataLayerOptions): Promise<void> {
+  guard();
+  if (!USE_BACKEND) return;
+  try {
+    await fetch(`${apiBase()}/api/maps/${encodeURIComponent(mapSlug)}/view`, {
+      method: 'POST',
+      credentials: 'include',
+      signal: options?.signal,
+    });
+  } catch {
+    // Non-fatal; don't break map load
+  }
+}
+
 // --- Nodes (backend) ---
 
 async function getNodesApi(mapSlug: string, options?: DataLayerOptions): Promise<MapNode[]> {

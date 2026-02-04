@@ -9,7 +9,8 @@ import {
   DEFAULT_COLLABORATOR_BODY,
 } from '../lib/invitation-email';
 import { parseXlsxFile, generateTemplateXlsx, type ImportResult } from '../lib/import-data';
-import { Trash2, Link2, QrCode, Pencil, X, Plus, Upload, Download, Image } from 'lucide-react';
+import { DEFAULT_ENABLED_NODE_TYPES, NODE_TYPE_LABELS } from '../constants';
+import { Trash2, Link2, QrCode, Pencil, X, Plus, Upload, Download, Image, ChevronDown, ChevronRight } from 'lucide-react';
 
 interface DashboardProps {
   onNavigate: (path: string) => void;
@@ -48,6 +49,7 @@ const THEME_PRESETS: { id: string; label: string; description: string; theme: Ma
         [NodeType.SPACE]: '#34D399',
         [NodeType.COMMUNITY]: '#38BDF8',
         [NodeType.REGION]: '#4a5568',
+        [NodeType.MEDIA]: '#9B59B6',
       },
       connectionLine: { color: '#059669', opacity: 0.6, thickness: 2 },
     },
@@ -69,6 +71,7 @@ const THEME_PRESETS: { id: string; label: string; description: string; theme: Ma
         [NodeType.SPACE]: '#22C55E',
         [NodeType.COMMUNITY]: '#E5E7EB',
         [NodeType.REGION]: '#94a3b8',
+        [NodeType.MEDIA]: '#9B59B6',
       },
       connectionLine: { color: '#38bdf8', opacity: 0.7, thickness: 2 },
     },
@@ -90,6 +93,7 @@ const THEME_PRESETS: { id: string; label: string; description: string; theme: Ma
         [NodeType.SPACE]: '#15803D',
         [NodeType.COMMUNITY]: '#1D4ED8',
         [NodeType.REGION]: '#4b5563',
+        [NodeType.MEDIA]: '#9B59B6',
       },
       connectionLine: { color: '#111827', opacity: 0.6, thickness: 2 },
     },
@@ -111,6 +115,7 @@ const THEME_PRESETS: { id: string; label: string; description: string; theme: Ma
         [NodeType.SPACE]: '#22C55E',
         [NodeType.COMMUNITY]: '#38BDF8',
         [NodeType.REGION]: '#94a3b8',
+        [NodeType.MEDIA]: '#9B59B6',
       },
       connectionLine: { color: '#14F4C9', opacity: 0.8, thickness: 2 },
     },
@@ -131,6 +136,8 @@ const THEME_PRESETS: { id: string; label: string; description: string; theme: Ma
         [NodeType.PERSON]: '#0EA5E9',
         [NodeType.SPACE]: '#16A34A',
         [NodeType.COMMUNITY]: '#065F46',
+        [NodeType.REGION]: '#4a5568',
+        [NodeType.MEDIA]: '#9B59B6',
       },
       connectionLine: { color: '#166534', opacity: 0.6, thickness: 2 },
     },
@@ -186,6 +193,9 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [customCommunityColor, setCustomCommunityColor] = useState<string>(
     DEFAULT_THEME.theme.categoryColors?.[NodeType.COMMUNITY] || '#3498DB',
   );
+  const [customMediaColor, setCustomMediaColor] = useState<string>(
+    DEFAULT_THEME.theme.categoryColors?.[NodeType.MEDIA] || '#9B59B6',
+  );
   const [customRegionColor, setCustomRegionColor] = useState<string>(
     DEFAULT_THEME.theme.categoryColors?.[NodeType.REGION] || '#4a5568',
   );
@@ -205,7 +215,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     DEFAULT_THEME.theme.connectionLine?.thickness ?? 2,
   );
   const [baseThemeId, setBaseThemeId] = useState<string>(DEFAULT_THEME.id);
-  const [enabledNodeTypes, setEnabledNodeTypes] = useState<NodeType[]>(Object.values(NodeType));
+  const [enabledNodeTypes, setEnabledNodeTypes] = useState<NodeType[]>(DEFAULT_ENABLED_NODE_TYPES);
   const [connectionsEnabled, setConnectionsEnabled] = useState(true);
   const [mapListSort, setMapListSort] = useState<'name-asc' | 'name-desc'>('name-asc');
   const [copiedMapId, setCopiedMapId] = useState<string | null>(null);
@@ -225,6 +235,10 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [mapIcon, setMapIcon] = useState<string>('🗺️');
   const [mapIconBackground, setMapIconBackground] = useState<string>('#059669');
   const [showIconPicker, setShowIconPicker] = useState(false);
+  const [themeSectionOpen, setThemeSectionOpen] = useState(false);
+  const [rolesSectionOpen, setRolesSectionOpen] = useState(false);
+  const [advancedSectionOpen, setAdvancedSectionOpen] = useState(false);
+  const [submitAsFeatured, setSubmitAsFeatured] = useState(false);
 
   const copyMapLink = (map: SceneMap) => {
     if (typeof window === 'undefined') return;
@@ -258,6 +272,9 @@ const Dashboard: React.FC<DashboardProps> = ({
       setMapIconBackground('#059669');
       setCustomMapBackgroundColor(DEFAULT_THEME.theme.backgroundColor ?? '#fdfcf0');
       setBackgroundFile(null);
+      setThemeSectionOpen(false);
+      setRolesSectionOpen(false);
+      setAdvancedSectionOpen(false);
     }
     setMapToDelete(null);
   };
@@ -324,6 +341,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       setCustomSpaceColor(themeToUse.categoryColors[NodeType.SPACE] || customSpaceColor);
       setCustomCommunityColor(themeToUse.categoryColors[NodeType.COMMUNITY] || customCommunityColor);
       setCustomRegionColor(themeToUse.categoryColors[NodeType.REGION] || customRegionColor);
+      setCustomMediaColor(themeToUse.categoryColors[NodeType.MEDIA] || customMediaColor);
     }
     setCustomMapBackgroundColor(themeToUse.backgroundColor ?? '#fdfcf0');
     setCustomRegionFont(themeToUse.regionFont ?? '');
@@ -335,9 +353,12 @@ const Dashboard: React.FC<DashboardProps> = ({
     setEnabledNodeTypes(
       match.enabledNodeTypes && match.enabledNodeTypes.length > 0
         ? match.enabledNodeTypes
-        : Object.values(NodeType),
+        : DEFAULT_ENABLED_NODE_TYPES,
     );
     setConnectionsEnabled(match.connectionsEnabled !== false);
+    setThemeSectionOpen(false);
+    setRolesSectionOpen(false);
+    setAdvancedSectionOpen(false);
   }, [initialEditSlug, maps, editingMapId]);
 
   const persistMaps = (next: SceneMap[]) => {
@@ -475,6 +496,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         [NodeType.SPACE]: customSpaceColor,
         [NodeType.COMMUNITY]: customCommunityColor,
         [NodeType.REGION]: customRegionColor,
+        [NodeType.MEDIA]: customMediaColor,
       },
       regionFont: customRegionFont || undefined,
       connectionLine: {
@@ -580,7 +602,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     setMapSlug('');
     setMapDescription('');
     setSelectedThemeId(DEFAULT_THEME.id);
-    setEnabledNodeTypes(Object.values(NodeType));
+    setEnabledNodeTypes(DEFAULT_ENABLED_NODE_TYPES);
     setConnectionsEnabled(true);
     setCollaboratorPassword('');
     setInvitedAdmins('');
@@ -780,10 +802,22 @@ const Dashboard: React.FC<DashboardProps> = ({
                         </p>
                       )}
                     </div>
-                    <hr className="border-emerald-100 my-4" />
+
+                    {/* Theme — collapsible, starts collapsed */}
+                    <div className="border border-emerald-100 rounded-xl overflow-hidden mt-4">
+                      <button
+                        type="button"
+                        onClick={() => setThemeSectionOpen((v) => !v)}
+                        className="w-full flex items-center gap-2 px-4 py-3 bg-emerald-50/50 text-left font-semibold text-emerald-900 hover:bg-emerald-50"
+                      >
+                        {themeSectionOpen ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                        Theme
+                      </button>
+                      {themeSectionOpen && (
+                      <div className="p-4 pt-0 space-y-2">
                     <div className="space-y-1">
                       <label className="text-sm font-semibold text-emerald-900">
-                        Theme
+                        Preset
                       </label>
                       <select
                         className="w-full bg-white/70 border border-emerald-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-400"
@@ -876,7 +910,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         </div>
                         <div className="space-y-1">
                           <label className="text-xs font-semibold text-emerald-900">
-                            Community colour
+                            Group colour
                           </label>
                           <input
                             type="color"
@@ -884,6 +918,22 @@ const Dashboard: React.FC<DashboardProps> = ({
                             value={customCommunityColor}
                             onChange={(e) => {
                               setCustomCommunityColor(e.target.value);
+                              if (selectedThemeId === baseThemeId) {
+                                setSelectedThemeId('custom');
+                              }
+                            }}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-emerald-900">
+                            Media colour
+                          </label>
+                          <input
+                            type="color"
+                            className="h-8 min-h-[44px] w-full rounded-md border border-emerald-100 bg-white/70 touch-manipulation"
+                            value={customMediaColor}
+                            onChange={(e) => {
+                              setCustomMediaColor(e.target.value);
                               if (selectedThemeId === baseThemeId) {
                                 setSelectedThemeId('custom');
                               }
@@ -1009,6 +1059,22 @@ const Dashboard: React.FC<DashboardProps> = ({
                         </div>
                       </div>
                     </div>
+                      </div>
+                      )}
+                    </div>
+
+                    {/* Roles & permissions — collapsible, starts collapsed */}
+                    <div className="border border-emerald-100 rounded-xl overflow-hidden mt-4">
+                      <button
+                        type="button"
+                        onClick={() => setRolesSectionOpen((v) => !v)}
+                        className="w-full flex items-center gap-2 px-4 py-3 bg-emerald-50/50 text-left font-semibold text-emerald-900 hover:bg-emerald-50"
+                      >
+                        {rolesSectionOpen ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                        Roles & permissions
+                      </button>
+                      {rolesSectionOpen && (
+                      <div className="p-4 pt-0 space-y-2">
                     <div className="space-y-2 pb-4">
                       <label className="text-sm font-semibold text-emerald-900 block">
                         Show on map
@@ -1034,7 +1100,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                               }}
                               className="rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
                             />
-                            {type.charAt(0).toUpperCase() + type.slice(1).toLowerCase()}
+                            {NODE_TYPE_LABELS[type]}
                           </label>
                         ))}
                         <label className="flex items-center gap-2 cursor-pointer text-sm text-emerald-900">
@@ -1116,9 +1182,35 @@ const Dashboard: React.FC<DashboardProps> = ({
                         </button>
                       </p>
                     </div>
-                    {editingMapId && (
-                      <>
-                        <div className="pt-3 border-t border-emerald-100">
+                      </div>
+                      )}
+                    </div>
+
+                    {/* Advanced — collapsible, starts collapsed */}
+                    <div className="border border-emerald-100 rounded-xl overflow-hidden mt-4">
+                      <button
+                        type="button"
+                        onClick={() => setAdvancedSectionOpen((v) => !v)}
+                        className="w-full flex items-center gap-2 px-4 py-3 bg-emerald-50/50 text-left font-semibold text-emerald-900 hover:bg-emerald-50"
+                      >
+                        {advancedSectionOpen ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                        Advanced
+                      </button>
+                      {advancedSectionOpen && (
+                      <div className="p-4 pt-0 space-y-2">
+                        <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-emerald-900">
+                          <input
+                            type="checkbox"
+                            checked={submitAsFeatured}
+                            onChange={(e) => setSubmitAsFeatured(e.target.checked)}
+                            className="rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
+                          />
+                          Submit as a featured map
+                        </label>
+                        <p className="text-xs text-emerald-700 -mt-1">
+                          Proud of your map? Share it to inspire others!
+                        </p>
+                        {editingMapId && (
                         <div className="space-y-2 pt-2 pb-6">
                           <label className="text-sm font-semibold text-emerald-900">
                             Upload data
@@ -1233,9 +1325,10 @@ const Dashboard: React.FC<DashboardProps> = ({
                           </p>
                         )}
                         </div>
-                        </div>
-                      </>
-                    )}
+                        )}
+                      </div>
+                      )}
+                    </div>
 
                     {mapError && (
                       <p className="text-[11px] text-rose-600 bg-rose-50 border border-rose-100 rounded-xl px-3 py-2">
@@ -1261,6 +1354,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                       setMode('signup');
                       setAuthError(null);
                       setConfirmPassword('');
+                      setForgotPasswordOpen(false);
+                      setForgotError(null);
+                      setForgotSuccess(false);
                     }}
                     className={`flex-1 text-xs font-semibold py-2 rounded-full ${
                       mode === 'signup'
@@ -1276,6 +1372,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                       setMode('login');
                       setAuthError(null);
                       setConfirmPassword('');
+                      setForgotPasswordOpen(false);
+                      setForgotError(null);
+                      setForgotSuccess(false);
                     }}
                     className={`flex-1 text-xs font-semibold py-2 rounded-full ${
                       mode === 'login'
@@ -1410,11 +1509,6 @@ const Dashboard: React.FC<DashboardProps> = ({
                   </div>
                 </form>
                 )}
-
-                <p className="text-[10px] text-emerald-700 mt-2">
-                  Accounts are stored locally in this browser for now. A future backend will handle
-                  secure authentication and real invitations.
-                </p>
               </>
             )}
           </div>
@@ -1460,55 +1554,57 @@ const Dashboard: React.FC<DashboardProps> = ({
                       </span>
                     </div>
                     <div className="flex items-center gap-0.5 shrink-0 ml-auto">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingMapId(map.id);
-                          setEditingOriginalSlug(map.slug);
-                          setMapTitle(map.title);
-                          setMapSlug(map.slug);
-                          setMapDescription(map.description);
-                          setSelectedThemeId(map.themeId || DEFAULT_THEME.id);
-                          setCollaboratorPassword(map.collaboratorPassword || '');
-                          setPublicView(map.publicView !== false);
-                          setInvitedAdmins((map.invitedAdminEmails || []).join(', '));
-                          setInvitedCollaborators((map.invitedCollaboratorEmails || []).join(', '));
-                          setInvitationEmailSubjectAdmin(map.invitationEmailSubjectAdmin ?? '');
-                          setInvitationEmailBodyAdmin(map.invitationEmailBodyAdmin ?? '');
-                          setInvitationEmailSubjectCollaborator(map.invitationEmailSubjectCollaborator ?? '');
-                          setInvitationEmailBodyCollaborator(map.invitationEmailBodyCollaborator ?? '');
-                          setInvitationSenderName(map.invitationSenderName ?? '');
-                          setMapIcon(map.icon ?? '🗺️');
-                          setMapIconBackground(map.iconBackground ?? '#059669');
-                          setBaseThemeId(map.themeId || DEFAULT_THEME.id);
-                          const preset = THEME_PRESETS.find((p) => p.id === map.themeId) ?? DEFAULT_THEME;
-                          const theme = map.theme || preset.theme;
-                          if (theme.categoryColors) {
-                            setCustomEventColor(theme.categoryColors[NodeType.EVENT] ?? customEventColor);
-                            setCustomPersonColor(theme.categoryColors[NodeType.PERSON] ?? customPersonColor);
-                            setCustomSpaceColor(theme.categoryColors[NodeType.SPACE] ?? customSpaceColor);
-                            setCustomCommunityColor(theme.categoryColors[NodeType.COMMUNITY] ?? customCommunityColor);
-                            setCustomRegionColor(theme.categoryColors[NodeType.REGION] ?? customRegionColor);
-                          }
-                          setCustomMapBackgroundColor(theme.backgroundColor ?? '#fdfcf0');
-                          setCustomRegionFont(theme.regionFont ?? '');
-                          if (theme.connectionLine) {
-                            setCustomConnectionLineColor(theme.connectionLine.color);
-                            setCustomConnectionLineOpacity(theme.connectionLine.opacity);
-                            setCustomConnectionLineThickness(theme.connectionLine.thickness);
-                          }
-                          setEnabledNodeTypes(
-                            map.enabledNodeTypes && map.enabledNodeTypes.length > 0
-                              ? map.enabledNodeTypes
-                              : Object.values(NodeType),
-                          );
-                          setConnectionsEnabled(map.connectionsEnabled !== false);
-                        }}
-                        className="p-1.5 rounded-lg text-emerald-700 hover:bg-emerald-100 transition-colors"
-                        title="Edit map"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
+                      {roleForMap(map) === 'Admin' && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingMapId(map.id);
+                            setEditingOriginalSlug(map.slug);
+                            setMapTitle(map.title);
+                            setMapSlug(map.slug);
+                            setMapDescription(map.description);
+                            setSelectedThemeId(map.themeId || DEFAULT_THEME.id);
+                            setCollaboratorPassword(map.collaboratorPassword || '');
+                            setPublicView(map.publicView !== false);
+                            setInvitedAdmins((map.invitedAdminEmails || []).join(', '));
+                            setInvitedCollaborators((map.invitedCollaboratorEmails || []).join(', '));
+                            setInvitationEmailSubjectAdmin(map.invitationEmailSubjectAdmin ?? '');
+                            setInvitationEmailBodyAdmin(map.invitationEmailBodyAdmin ?? '');
+                            setInvitationEmailSubjectCollaborator(map.invitationEmailSubjectCollaborator ?? '');
+                            setInvitationEmailBodyCollaborator(map.invitationEmailBodyCollaborator ?? '');
+                            setInvitationSenderName(map.invitationSenderName ?? '');
+                            setMapIcon(map.icon ?? '🗺️');
+                            setMapIconBackground(map.iconBackground ?? '#059669');
+                            setBaseThemeId(map.themeId || DEFAULT_THEME.id);
+                            const preset = THEME_PRESETS.find((p) => p.id === map.themeId) ?? DEFAULT_THEME;
+                            const theme = map.theme || preset.theme;
+                            if (theme.categoryColors) {
+                              setCustomEventColor(theme.categoryColors[NodeType.EVENT] ?? customEventColor);
+                              setCustomPersonColor(theme.categoryColors[NodeType.PERSON] ?? customPersonColor);
+                              setCustomSpaceColor(theme.categoryColors[NodeType.SPACE] ?? customSpaceColor);
+                              setCustomCommunityColor(theme.categoryColors[NodeType.COMMUNITY] ?? customCommunityColor);
+                              setCustomRegionColor(theme.categoryColors[NodeType.REGION] ?? customRegionColor);
+                            }
+                            setCustomMapBackgroundColor(theme.backgroundColor ?? '#fdfcf0');
+                            setCustomRegionFont(theme.regionFont ?? '');
+                            if (theme.connectionLine) {
+                              setCustomConnectionLineColor(theme.connectionLine.color);
+                              setCustomConnectionLineOpacity(theme.connectionLine.opacity);
+                              setCustomConnectionLineThickness(theme.connectionLine.thickness);
+                            }
+                            setEnabledNodeTypes(
+                              map.enabledNodeTypes && map.enabledNodeTypes.length > 0
+                                ? map.enabledNodeTypes
+                                : Object.values(NodeType),
+                            );
+                            setConnectionsEnabled(map.connectionsEnabled !== false);
+                          }}
+                          className="p-1.5 rounded-lg text-emerald-700 hover:bg-emerald-100 transition-colors"
+                          title="Edit map"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => copyMapLink(map)}
@@ -1525,14 +1621,16 @@ const Dashboard: React.FC<DashboardProps> = ({
                       >
                         <QrCode className="w-4 h-4" />
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => setMapToDelete(map)}
-                        className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-100 transition-colors"
-                        title="Delete map"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {roleForMap(map) === 'Admin' && (
+                        <button
+                          type="button"
+                          onClick={() => setMapToDelete(map)}
+                          className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-100 transition-colors"
+                          title="Delete map"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </li>
                 ))}
@@ -1546,6 +1644,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                   setMapSlug('');
                   setMapDescription('');
                   setSelectedThemeId(DEFAULT_THEME.id);
+                  setThemeSectionOpen(false);
+                  setRolesSectionOpen(false);
+                  setAdvancedSectionOpen(false);
                   setBaseThemeId(DEFAULT_THEME.id);
                   const t = DEFAULT_THEME.theme;
                   if (t.categoryColors) {
@@ -1575,7 +1676,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                   setBackgroundFile(null);
                   setBackgroundError(null);
                   setMapError(null);
-                  setEnabledNodeTypes(Object.values(NodeType));
+                  setEnabledNodeTypes(DEFAULT_ENABLED_NODE_TYPES);
                   setConnectionsEnabled(true);
                 }}
                 className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed border-emerald-200 text-emerald-700 font-semibold text-sm hover:bg-emerald-50 hover:border-emerald-300 transition-colors"

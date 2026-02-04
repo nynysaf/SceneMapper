@@ -5,6 +5,7 @@ export enum NodeType {
   SPACE = 'SPACE',
   COMMUNITY = 'COMMUNITY',
   REGION = 'REGION',
+  MEDIA = 'MEDIA',
 }
 
 export interface MapNode {

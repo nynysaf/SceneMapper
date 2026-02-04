@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import Link from 'next/link';
 import type { User, SceneMap } from '../types';
 
 /**
@@ -231,6 +232,19 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, currentUser, user
           </div>
         </section>
       </main>
+
+      <footer className="px-6 md:px-16 py-12 border-t border-emerald-100 bg-white/40">
+        <p className="text-emerald-800 text-sm md:text-base leading-relaxed max-w-2xl">
+          Take your scene & network mapping to the next level:{' '}
+          <Link
+            href="/contact"
+            className="font-semibold text-emerald-700 hover:text-emerald-900 underline"
+          >
+            contact our guild
+          </Link>
+          {' '}for workshops, consulting, and custom software.
+        </p>
+      </footer>
     </div>
   );
 };

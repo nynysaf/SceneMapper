@@ -13,8 +13,14 @@ export interface ConnectionLineStyle {
 interface MapProps {
   nodes: MapNode[];
   onNodeMove: (id: string, x: number, y: number) => void;
-  onNodeSelect: (node: MapNode, pos: { x: number, y: number }) => void;
-  onMapClick?: (x: number, y: number) => void;
+  onNodeSelect: (node: MapNode, pos: { x: number, y: number }, opts?: { shiftKey?: boolean }) => void;
+  onMapClick?: (x: number, y: number, event?: { clientX: number; clientY: number }) => void;
+  /** When multiple nodes are selected, dragging any of them moves all. Desktop only. */
+  selectedNodeIds?: string[];
+  /** Called when multiple selected nodes are moved together. */
+  onNodesMove?: (updates: { id: string; x: number; y: number }[]) => void;
+  /** Called when user clicks the map background (not on a node). Use to clear multi-selection. */
+  onMapBackgroundClick?: () => void;
   isEditable: boolean;
   isPlacing?: boolean;
   /**
@@ -96,6 +102,9 @@ const Map: React.FC<MapProps> = ({
   onNodeMove,
   onNodeSelect,
   onMapClick,
+  selectedNodeIds = [],
+  onNodesMove,
+  onMapBackgroundClick,
   isEditable,
   isPlacing,
   backgroundImageUrl,
@@ -115,9 +124,10 @@ const Map: React.FC<MapProps> = ({
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const dragStartRef = useRef({ x: 0, y: 0 });
-  const dragJustEndedRef = useRef(false); // kept for backwards compat with any cached bundles; unused
+  const bulkDragStartRef = useRef<Record<string, { x: number; y: number }>>({});
   const connectionDragCleanupRef = useRef<(() => void) | null>(null);
   const DRAG_THRESHOLD_SQ = 25; // 5px movement = real drag (below = treat as click)
+  const selectedSet = useMemo(() => new Set(selectedNodeIds), [selectedNodeIds]);
 
   const lineStyle = connectionLineStyle ?? {
     color: '#059669',
@@ -141,8 +151,10 @@ const Map: React.FC<MapProps> = ({
     container.selectAll('.node-group').remove();
 
     // Setup Zoom behavior (disabled in export mode so transform stays identity)
+    // translateExtent keeps part of map visible: prevents panning so far that map is lost
     const zoom = d3.zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.5, 5])
+      .translateExtent([[0, 0], [1000, 1000]])
       .on('zoom', (event) => {
         container.attr('transform', event.transform);
       });
@@ -198,7 +210,13 @@ const Map: React.FC<MapProps> = ({
         const pathD = () => `M ${x1} ${y1} Q ${cpxCur} ${cpyCur} ${x2} ${y2}`;
         const isPending = conn.status === 'pending';
         const strokeOpacity = isPending ? 0.4 : lineStyle.opacity;
-        const group = connectionLayer.append('g').attr('class', 'connection-group');
+        const group = connectionLayer
+          .append('g')
+          .attr('class', 'connection-group')
+          .attr('data-from-id', conn.fromNodeId)
+          .attr('data-to-id', conn.toNodeId)
+          .attr('data-cpx', cpx)
+          .attr('data-cpy', cpy);
         group
           .append('path')
           .attr('d', pathD())
@@ -379,45 +397,112 @@ const Map: React.FC<MapProps> = ({
       }, { capture: true });
     }
 
+    // Helper to update connection paths when nodes are being dragged (single or bulk)
+    const getPos = (id: string, overrides: Record<string, { x: number; y: number }>) => {
+      const o = overrides[id];
+      if (o) return o;
+      const n = nodeById[id];
+      return n ? { x: n.x * SCALE, y: n.y * SCALE } : { x: 0, y: 0 };
+    };
+    const updateConnectionsForPositions = (overrides: Record<string, { x: number; y: number }>) => {
+      container.selectAll('.connection-group').each(function (this: SVGGElement) {
+        const g = d3.select(this);
+        const fromId = g.attr('data-from-id');
+        const toId = g.attr('data-to-id');
+        const fromNode = nodeById[fromId];
+        const toNode = nodeById[toId];
+        if (!fromNode || !toNode) return;
+        if (!overrides[fromId] && !overrides[toId]) return;
+        const cpx = parseFloat(g.attr('data-cpx') || '0');
+        const cpy = parseFloat(g.attr('data-cpy') || '0');
+        const p1 = getPos(fromId, overrides);
+        const p2 = getPos(toId, overrides);
+        const d = `M ${p1.x} ${p1.y} Q ${cpx} ${cpy} ${p2.x} ${p2.y}`;
+        g.selectAll('path').attr('d', d);
+      });
+    };
+
     // Enable Drag and Drop for authorized roles
     if (isEditable && !isPlacing) {
       const drag = d3.drag<SVGGElement, MapNode>()
         .subject((event, d) => {
           const sub = { x: d.x * SCALE, y: d.y * SCALE };
           dragStartRef.current = { x: sub.x, y: sub.y };
+          const isBulk = selectedSet.has(d.id) && selectedSet.size > 1;
+          if (isBulk && onNodesMove) {
+            bulkDragStartRef.current = {};
+            selectedSet.forEach((id) => {
+              const n = nodeById[id];
+              if (n) bulkDragStartRef.current[id] = { x: n.x * SCALE, y: n.y * SCALE };
+            });
+          } else {
+            bulkDragStartRef.current = {};
+          }
           return sub;
         })
         .on('start', function() {
-          d3.select(this).raise(); // Bring to front
+          d3.select(this).raise();
           d3.select(this).select('circle:nth-child(2)')
             .attr('stroke', '#FFD700')
             .attr('stroke-width', 4);
         })
-        .on('drag', function(event) {
-          const x = Math.max(0, Math.min(1000, event.x));
-          const y = Math.max(0, Math.min(1000, event.y));
-          d3.select(this).attr('transform', `translate(${x}, ${y})`);
+        .on('drag', function(event, d) {
+          const dx = event.x - dragStartRef.current.x;
+          const dy = event.y - dragStartRef.current.y;
+          const isBulk = selectedSet.has(d.id) && selectedSet.size > 1 && Object.keys(bulkDragStartRef.current).length > 0;
+
+          if (isBulk) {
+            const overrides: Record<string, { x: number; y: number }> = {};
+            Object.entries(bulkDragStartRef.current).forEach(([id, start]) => {
+              const nx = Math.max(0, Math.min(1000, start.x + dx));
+              const ny = Math.max(0, Math.min(1000, start.y + dy));
+              overrides[id] = { x: nx, y: ny };
+            });
+            container.selectAll<SVGGElement, MapNode>('.node-group').each(function (this: SVGGElement, nodeData: MapNode) {
+              if (overrides[nodeData.id]) {
+                const p = overrides[nodeData.id];
+                d3.select(this).attr('transform', `translate(${p.x}, ${p.y})`);
+              }
+            });
+            updateConnectionsForPositions(overrides);
+          } else {
+            const x = Math.max(0, Math.min(1000, event.x));
+            const y = Math.max(0, Math.min(1000, event.y));
+            d3.select(this).attr('transform', `translate(${x}, ${y})`);
+            updateConnectionsForPositions({ [d.id]: { x, y } });
+          }
         })
         .on('end', function (event, d) {
           d3.select(this).select('circle:nth-child(2)')
             .attr('stroke', '#FFFFFF')
             .attr('stroke-width', 2);
 
-          const xPct = (event.x / 1000) * 100;
-          const yPct = (event.y / 1000) * 100;
-          onNodeMove(d.id, xPct, yPct);
-
-          // When drag is on the same element, click often never fires. Treat "no movement" as click and open popup here.
           const dx = event.x - dragStartRef.current.x;
           const dy = event.y - dragStartRef.current.y;
+          const isBulk = selectedSet.has(d.id) && selectedSet.size > 1 && Object.keys(bulkDragStartRef.current).length > 0;
+
+          if (isBulk && onNodesMove) {
+            const updates: { id: string; x: number; y: number }[] = [];
+            Object.entries(bulkDragStartRef.current).forEach(([id, start]) => {
+              const nx = Math.max(0, Math.min(1000, start.x + dx));
+              const ny = Math.max(0, Math.min(1000, start.y + dy));
+              updates.push({ id, x: (nx / 1000) * 100, y: (ny / 1000) * 100 });
+            });
+            onNodesMove(updates);
+          } else {
+            const xPct = (event.x / 1000) * 100;
+            const yPct = (event.y / 1000) * 100;
+            onNodeMove(d.id, xPct, yPct);
+          }
+          bulkDragStartRef.current = {};
+
+          // Treat minimal movement as click (including Shift+Click for multi-select)
           if (dx * dx + dy * dy <= DRAG_THRESHOLD_SQ) {
             const group = this as SVGGElement;
             const circle = group.querySelector('circle:nth-child(2)');
             const rect = circle ? (circle as SVGCircleElement).getBoundingClientRect() : group.getBoundingClientRect();
-            onNodeSelect(d, {
-              x: rect.left + rect.width / 2,
-              y: rect.top + rect.height / 2,
-            });
+            const shiftKey = (event.sourceEvent as MouseEvent)?.shiftKey ?? false;
+            onNodeSelect(d, { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }, { shiftKey });
           }
         });
 
@@ -426,27 +511,26 @@ const Map: React.FC<MapProps> = ({
       // When drag is NOT enabled (view-only or placing), use click to open popup
       nodeGroups.on('click', function (event: MouseEvent, d: MapNode) {
         if (isPlacing) return;
-        onNodeSelect(d, { x: event.clientX, y: event.clientY });
+        onNodeSelect(d, { x: event.clientX, y: event.clientY }, { shiftKey: event.shiftKey });
       });
     }
 
-    // Handle Coordinate Capture for new nodes
-    svg.on('click', function(event) {
-      if (!isPlacing || !onMapClick) return;
-      
-      // Ignore clicks on existing nodes
-      if ((event.target as any).closest('.node-group')) return;
+    // Handle map click: placement (when placing) or clear multi-selection (when not placing)
+    svg.on('click', function(event: MouseEvent) {
+      if ((event.target as any).closest?.('.node-group')) return;
 
-      const pt = svgRef.current!.createSVGPoint();
-      pt.x = event.clientX;
-      pt.y = event.clientY;
-      const svgP = pt.matrixTransform(container.node()!.getScreenCTM()!.inverse());
-      
-      const xPct = (svgP.x / 1000) * 100;
-      const yPct = (svgP.y / 1000) * 100;
-      
-      if (xPct >= 0 && xPct <= 100 && yPct >= 0 && yPct <= 100) {
-        onMapClick(xPct, yPct);
+      if (isPlacing && onMapClick) {
+        const pt = svgRef.current!.createSVGPoint();
+        pt.x = event.clientX;
+        pt.y = event.clientY;
+        const svgP = pt.matrixTransform(container.node()!.getScreenCTM()!.inverse());
+        const xPct = (svgP.x / 1000) * 100;
+        const yPct = (svgP.y / 1000) * 100;
+        if (xPct >= 0 && xPct <= 100 && yPct >= 0 && yPct <= 100) {
+          onMapClick(xPct, yPct, { clientX: event.clientX, clientY: event.clientY });
+        }
+      } else if (!isPlacing && onMapBackgroundClick) {
+        onMapBackgroundClick();
       }
     });
 
@@ -454,7 +538,7 @@ const Map: React.FC<MapProps> = ({
     return () => {
       connectionDragCleanupRef.current?.();
     };
-  }, [nodes, connections, currentUserName, lineStyle, onNodeMove, onNodeSelect, onMapClick, isEditable, isPlacing, nodeSizeScale, nodeLabelFontScale, regionFontScale, regionFontFamily, categoryColors, onConnectionCurveChange, onConnectionCreate, exportMode]);
+  }, [nodes, connections, currentUserName, lineStyle, onNodeMove, onNodeSelect, onMapClick, isEditable, isPlacing, nodeSizeScale, nodeLabelFontScale, regionFontScale, regionFontFamily, categoryColors, onConnectionCurveChange, onConnectionCreate, exportMode, selectedNodeIds, onNodesMove, onMapBackgroundClick]);
 
   return (
     <svg 
