@@ -155,6 +155,15 @@ const Map: React.FC<MapProps> = ({
     const zoom = d3.zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.5, 5])
       .translateExtent([[0, 0], [1000, 1000]])
+      .filter(function (event: MouseEvent | TouchEvent | WheelEvent) {
+        // D3 default: block right-click; allow ctrl only for wheel (pinch-zoom)
+        const e = event as MouseEvent & { type?: string };
+        if (!((!e.ctrlKey || e.type === 'wheel') && !e.button)) return false;
+        // Allow pan only when clicking background — not on nodes or connections (their drag handlers take priority)
+        const target = (event.target as Element);
+        if (target?.closest?.('.node-group') || target?.closest?.('.connection-group')) return false;
+        return true;
+      })
       .on('zoom', (event) => {
         container.attr('transform', event.transform);
       });
@@ -177,7 +186,7 @@ const Map: React.FC<MapProps> = ({
       return false;
     });
     if (connectionsToDraw.length > 0) {
-      const connectionLayer = container.append('g').attr('class', 'connection-layer');
+      const connectionLayer = container.append('g').attr('class', 'connection-layer').style('pointer-events', 'none');
       const canEditCurve = isEditable && !isPlacing && !!onConnectionCurveChange;
       connectionsToDraw.forEach((conn) => {
         const fromNode = nodeById[conn.fromNodeId];
