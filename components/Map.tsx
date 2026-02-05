@@ -154,7 +154,7 @@ const Map: React.FC<MapProps> = ({
     // translateExtent keeps part of map visible: prevents panning so far that map is lost
     const zoom = d3.zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.5, 5])
-      .translateExtent([[0, 0], [1000, 1000]])
+      .translateExtent([[-1500, -1500], [2500, 2500]]) // Allow panning well beyond map edges
       .filter(function (event: MouseEvent | TouchEvent | WheelEvent) {
         // D3 default: block right-click; allow ctrl only for wheel (pinch-zoom)
         const e = event as MouseEvent & { type?: string };
@@ -553,7 +553,7 @@ const Map: React.FC<MapProps> = ({
     <svg 
       ref={svgRef} 
       viewBox="0 0 1000 1000"
-      preserveAspectRatio="xMidYMid slice"
+      preserveAspectRatio="xMidYMid meet"
       className={`w-full h-full selection:bg-none outline-none ${isPlacing ? 'cursor-crosshair' : ''}`}
       style={{ touchAction: 'none', backgroundColor: mapBackgroundColor }}
     >
