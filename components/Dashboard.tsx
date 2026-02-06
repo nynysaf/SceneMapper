@@ -1009,11 +1009,6 @@ const Dashboard: React.FC<DashboardProps> = ({
                               {(() => { const ic = connectionConfig?.icon ?? MAP_TEMPLATES.find((t) => t.id === (mapTemplateId ?? DEFAULT_MAP_TEMPLATE_ID))?.connectionIcon ?? 'Link2'; const isImg = ic && (ic.startsWith('data:') || ic.startsWith('http')); const Ic = getIconComponent(ic); return isImg ? <img src={ic} alt="" className="w-6 h-6 object-contain" /> : Ic ? <Ic className="w-5 h-5 text-white" strokeWidth={2.5} /> : <span className="text-white text-sm">?</span>; })()}
                             </button>
                             <input type="text" value={connectionConfig?.label ?? MAP_TEMPLATES.find((t) => t.id === (mapTemplateId ?? DEFAULT_MAP_TEMPLATE_ID))?.connectionLabel ?? 'Connections'} onChange={(e) => setConnectionConfig((c) => ({ ...c, label: e.target.value }))} className="flex-1 min-w-0 bg-white/70 border border-emerald-100 rounded-lg px-2 py-1.5 text-sm" placeholder="Connections" />
-                            <div className="flex items-center gap-2 shrink-0">
-                              <input type="color" className="h-8 w-12 rounded border border-emerald-100" value={customConnectionLineColor} onChange={(e) => { setCustomConnectionLineColor(e.target.value); if (selectedThemeId === baseThemeId) setSelectedThemeId('custom'); }} />
-                              <input type="range" min={0} max={1} step={0.1} className="w-16" value={customConnectionLineOpacity} onChange={(e) => { setCustomConnectionLineOpacity(Number(e.target.value)); if (selectedThemeId === baseThemeId) setSelectedThemeId('custom'); }} />
-                              <span className="text-[10px] w-8">{Math.round(customConnectionLineOpacity * 100)}%</span>
-                            </div>
                           </div>
                         </div>
 

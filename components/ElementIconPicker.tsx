@@ -1,8 +1,18 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { X, Image } from 'lucide-react';
-import { ICON_CATEGORIES, getIconComponent } from '@/lib/icons';
+import { ICON_NAMES, getIconComponent } from '@/lib/icons';
+
+const ICONS_PER_GRID = 25; // 5x5
+
+function chunk<T>(arr: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) {
+    chunks.push(arr.slice(i, i + size));
+  }
+  return chunks;
+}
 
 interface ElementIconPickerProps {
   value: string;
@@ -23,8 +33,8 @@ export default function ElementIconPicker({
   onColorChange,
   onClose,
 }: ElementIconPickerProps) {
-  const [activeCategory, setActiveCategory] = useState(0);
   const isCustomImage = value && (value.startsWith('data:') || value.startsWith('http'));
+  const iconGrids = chunk(ICON_NAMES, ICONS_PER_GRID);
 
   return (
     <div
@@ -32,11 +42,11 @@ export default function ElementIconPicker({
       onClick={onClose}
     >
       <div
-        className="glass w-full max-w-md rounded-3xl solarpunk-shadow overflow-hidden flex flex-col max-h-[85vh] animate-in fade-in zoom-in duration-300"
+        className="glass w-full max-w-[280px] rounded-3xl solarpunk-shadow overflow-hidden flex flex-col max-h-[85vh] animate-in fade-in zoom-in duration-300"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="p-4 border-b border-emerald-100 bg-white/60 flex justify-between items-center shrink-0">
-          <h2 className="text-lg font-bold text-emerald-950">Choose icon</h2>
+        <div className="p-3 border-b border-emerald-100 bg-white/60 flex justify-between items-center shrink-0">
+          <h2 className="text-base font-bold text-emerald-950">Choose icon</h2>
           <button
             type="button"
             onClick={onClose}
@@ -47,10 +57,10 @@ export default function ElementIconPicker({
           </button>
         </div>
 
-        <div className="p-4 space-y-4 overflow-y-auto flex-1">
+        <div className="p-3 space-y-3 overflow-y-auto flex-1">
           <div className="flex justify-center">
             <div
-              className="w-16 h-16 rounded-xl flex items-center justify-center overflow-hidden shrink-0"
+              className="w-14 h-14 rounded-xl flex items-center justify-center overflow-hidden shrink-0"
               style={{ backgroundColor }}
             >
               {isCustomImage ? (
@@ -59,18 +69,18 @@ export default function ElementIconPicker({
                 (() => {
                   const IconComponent = getIconComponent(value);
                   return IconComponent ? (
-                    <IconComponent className="w-8 h-8 text-white" strokeWidth={2.5} />
+                    <IconComponent className="w-7 h-7 text-white" strokeWidth={2.5} />
                   ) : (
-                    <span className="text-2xl text-white/80">?</span>
+                    <span className="text-xl text-white/80">?</span>
                   );
                 })()
               )}
             </div>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <label className="text-xs font-semibold text-emerald-900">Upload custom image</label>
-            <label className="flex items-center justify-center gap-2 py-2 rounded-xl border-2 border-dashed border-emerald-200 text-emerald-700 font-medium text-sm hover:bg-emerald-50 hover:border-emerald-300 transition-colors cursor-pointer">
+            <label className="flex items-center justify-center gap-2 py-2 rounded-xl border-2 border-dashed border-emerald-200 text-emerald-700 font-medium text-xs hover:bg-emerald-50 hover:border-emerald-300 transition-colors cursor-pointer">
               <Image className="w-4 h-4" />
               Choose image
               <input
@@ -90,46 +100,37 @@ export default function ElementIconPicker({
                 }}
               />
             </label>
-            <p className="text-[10px] text-emerald-700">PNG, JPG, WebP or GIF · square images work best</p>
+            <p className="text-[10px] text-emerald-700">PNG, JPG, WebP or GIF</p>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <label className="text-xs font-semibold text-emerald-900">Lucide icons</label>
-            <div className="flex gap-1 flex-wrap">
-              {ICON_CATEGORIES.map((cat, idx) => (
-                <button
-                  key={cat.label}
-                  type="button"
-                  onClick={() => setActiveCategory(idx)}
-                  className={`px-2 py-1 rounded-lg text-xs font-medium transition-colors ${
-                    activeCategory === idx
-                      ? 'bg-emerald-600 text-white'
-                      : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                  }`}
+            <div className="flex overflow-x-auto gap-4 snap-x snap-mandatory scroll-smooth overscroll-x-contain touch-pan-x [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {iconGrids.map((icons, gridIdx) => (
+                <div
+                  key={gridIdx}
+                  className="grid grid-cols-5 gap-1.5 shrink-0 snap-center w-[calc(100%-1rem)] min-w-[240px]"
                 >
-                  {cat.label}
-                </button>
+                  {icons.map((iconName) => {
+                    const IconComp = getIconComponent(iconName);
+                    const selected = !isCustomImage && value === iconName;
+                    return (
+                      <button
+                        key={iconName}
+                        type="button"
+                        onClick={() => onChange(iconName)}
+                        className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors ${
+                          selected ? 'bg-emerald-200 ring-2 ring-emerald-500' : 'bg-white/70 hover:bg-emerald-50'
+                        }`}
+                        style={selected ? {} : { color: '#047857' }}
+                        title={iconName}
+                      >
+                        {IconComp ? <IconComp className="w-4 h-4" strokeWidth={2} /> : <span>?</span>}
+                      </button>
+                    );
+                  })}
+                </div>
               ))}
-            </div>
-            <div className="grid grid-cols-6 gap-2 max-h-48 overflow-y-auto">
-              {ICON_CATEGORIES[activeCategory]?.icons.map((iconName) => {
-                const IconComp = getIconComponent(iconName);
-                const selected = !isCustomImage && value === iconName;
-                return (
-                  <button
-                    key={iconName}
-                    type="button"
-                    onClick={() => onChange(iconName)}
-                    className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
-                      selected ? 'bg-emerald-200 ring-2 ring-emerald-500' : 'bg-white/70 hover:bg-emerald-50'
-                    }`}
-                    style={selected ? {} : { color: '#047857' }}
-                    title={iconName}
-                  >
-                    {IconComp ? <IconComp className="w-5 h-5" strokeWidth={2} /> : <span>?</span>}
-                  </button>
-                );
-              })}
             </div>
           </div>
 
