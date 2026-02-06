@@ -9,8 +9,20 @@ import {
   DEFAULT_COLLABORATOR_BODY,
 } from '../lib/invitation-email';
 import { parseXlsxFile, generateTemplateXlsx, type ImportResult } from '../lib/import-data';
-import { DEFAULT_ENABLED_NODE_TYPES, NODE_TYPE_LABELS } from '../constants';
-import { Trash2, Link2, QrCode, Pencil, X, Plus, Upload, Download, Image, ChevronDown, ChevronRight } from 'lucide-react';
+import { DEFAULT_ENABLED_NODE_TYPES } from '../constants';
+import {
+  MAP_TEMPLATES,
+  DEFAULT_MAP_TEMPLATE_ID,
+  REORDERABLE_NODE_TYPES,
+  buildElementConfig,
+  buildConnectionConfig,
+  getElementLabel,
+  getElementIcon,
+  getEnabledNodeTypes,
+} from '../lib/element-config';
+import { getIconComponent } from '../lib/icons';
+import ElementIconPicker from './ElementIconPicker';
+import { Trash2, Link2, QrCode, Pencil, X, Plus, Upload, Download, Image, ChevronDown, ChevronRight, GripVertical } from 'lucide-react';
 
 interface DashboardProps {
   onNavigate: (path: string) => void;
@@ -217,6 +229,12 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [baseThemeId, setBaseThemeId] = useState<string>(DEFAULT_THEME.id);
   const [enabledNodeTypes, setEnabledNodeTypes] = useState<NodeType[]>(DEFAULT_ENABLED_NODE_TYPES);
   const [connectionsEnabled, setConnectionsEnabled] = useState(true);
+  const [mapTemplateId, setMapTemplateId] = useState<SceneMap['mapTemplateId']>(DEFAULT_MAP_TEMPLATE_ID);
+  const [elementConfig, setElementConfig] = useState<SceneMap['elementConfig']>(undefined);
+  const [connectionConfig, setConnectionConfig] = useState<SceneMap['connectionConfig']>(undefined);
+  const [elementOrder, setElementOrder] = useState<NodeType[]>(() => [...REORDERABLE_NODE_TYPES]);
+  const [elementPickerFor, setElementPickerFor] = useState<'icon' | null>(null);
+  const [elementPickerTarget, setElementPickerTarget] = useState<{ type: NodeType | 'CONNECTION'; colorKey: string } | null>(null);
   const [mapListSort, setMapListSort] = useState<'name-asc' | 'name-desc'>('name-asc');
   const [copiedMapId, setCopiedMapId] = useState<string | null>(null);
   const [qrMapSlug, setQrMapSlug] = useState<string | null>(null);
@@ -268,15 +286,19 @@ const Dashboard: React.FC<DashboardProps> = ({
       setInvitationEmailSubjectCollaborator('');
       setInvitationEmailBodyCollaborator('');
       setInvitationSenderName('');
-      setMapIcon('🗺️');
-      setMapIconBackground('#059669');
-      setCustomMapBackgroundColor(DEFAULT_THEME.theme.backgroundColor ?? '#fdfcf0');
-      setBackgroundFile(null);
-      setThemeSectionOpen(false);
-      setRolesSectionOpen(false);
-      setAdvancedSectionOpen(false);
-    }
-    setMapToDelete(null);
+    setMapIcon('🗺️');
+    setMapIconBackground('#059669');
+    setCustomMapBackgroundColor(DEFAULT_THEME.theme.backgroundColor ?? '#fdfcf0');
+    setBackgroundFile(null);
+    setMapTemplateId(DEFAULT_MAP_TEMPLATE_ID);
+    setElementConfig(undefined);
+    setConnectionConfig(undefined);
+    setElementOrder([...REORDERABLE_NODE_TYPES]);
+    setThemeSectionOpen(false);
+    setRolesSectionOpen(false);
+    setAdvancedSectionOpen(false);
+  }
+  setMapToDelete(null);
   };
 
   const roleForMap = (map: SceneMap): 'Admin' | 'Collaborator' | 'Viewed' => {
@@ -356,6 +378,15 @@ const Dashboard: React.FC<DashboardProps> = ({
         : DEFAULT_ENABLED_NODE_TYPES,
     );
     setConnectionsEnabled(match.connectionsEnabled !== false);
+    setMapTemplateId((match.mapTemplateId as SceneMap['mapTemplateId']) || DEFAULT_MAP_TEMPLATE_ID);
+    if (match.elementConfig) {
+      setElementConfig(match.elementConfig);
+    } else {
+      const tpl = (match.mapTemplateId as 'scene' | 'ideas' | 'network') ?? DEFAULT_MAP_TEMPLATE_ID;
+      const enabled = match.enabledNodeTypes ?? DEFAULT_ENABLED_NODE_TYPES;
+      setElementConfig(buildElementConfig(tpl, undefined, enabled));
+    }
+    setConnectionConfig(match.connectionConfig ?? undefined);
     setThemeSectionOpen(false);
     setRolesSectionOpen(false);
     setAdvancedSectionOpen(false);
@@ -531,6 +562,9 @@ const Dashboard: React.FC<DashboardProps> = ({
       connectionsEnabled: connectionsEnabled ? undefined : false,
       icon: mapIcon || undefined,
       iconBackground: mapIconBackground || undefined,
+      mapTemplateId: mapTemplateId ?? DEFAULT_MAP_TEMPLATE_ID,
+      elementConfig: elementConfig ?? undefined,
+      connectionConfig: connectionConfig ?? undefined,
     };
 
     if (backgroundImageUrl !== undefined) {
@@ -616,6 +650,10 @@ const Dashboard: React.FC<DashboardProps> = ({
     setMapIconBackground('#059669');
     setCustomMapBackgroundColor(DEFAULT_THEME.theme.backgroundColor ?? '#fdfcf0');
     setBackgroundFile(null);
+    setMapTemplateId(DEFAULT_MAP_TEMPLATE_ID);
+    setElementConfig(undefined);
+    setConnectionConfig(undefined);
+    setElementOrder([...REORDERABLE_NODE_TYPES]);
     setEditingMapId(null);
     setEditingOriginalSlug(null);
 
@@ -803,7 +841,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                       )}
                     </div>
 
-                    {/* Theme — collapsible, starts collapsed */}
+                    {/* Elements & Connections — collapsible */}
                     <div className="border border-emerald-100 rounded-xl overflow-hidden mt-4">
                       <button
                         type="button"
@@ -811,254 +849,181 @@ const Dashboard: React.FC<DashboardProps> = ({
                         className="w-full flex items-center gap-2 px-4 py-3 bg-emerald-50/50 text-left font-semibold text-emerald-900 hover:bg-emerald-50"
                       >
                         {themeSectionOpen ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
-                        Theme
+                        Elements & Connections
                       </button>
                       {themeSectionOpen && (
-                      <div className="p-4 pt-0 space-y-2">
-                    <div className="space-y-1">
-                      <label className="text-sm font-semibold text-emerald-900">
-                        Preset
-                      </label>
-                      <select
-                        className="w-full bg-white/70 border border-emerald-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-400"
-                        value={selectedThemeId}
-                        onChange={(e) => {
-                          const id = e.target.value;
-                          setSelectedThemeId(id);
-                          setBaseThemeId(id);
-                          const preset = THEME_PRESETS.find((p) => p.id === id) ?? DEFAULT_THEME;
-                          const cat = preset.theme.categoryColors;
-                          if (cat) {
-                            setCustomEventColor(cat[NodeType.EVENT] || customEventColor);
-                            setCustomPersonColor(cat[NodeType.PERSON] || customPersonColor);
-                            setCustomSpaceColor(cat[NodeType.SPACE] || customSpaceColor);
-                            setCustomCommunityColor(
-                              cat[NodeType.COMMUNITY] || customCommunityColor,
-                            );
-                            setCustomRegionColor(cat[NodeType.REGION] || customRegionColor);
-                          }
-                          setCustomMapBackgroundColor(preset.theme.backgroundColor ?? '#fdfcf0');
-                          setCustomRegionFont(preset.theme.regionFont ?? '');
-                          const conn = preset.theme.connectionLine;
-                          if (conn) {
-                            setCustomConnectionLineColor(conn.color);
-                            setCustomConnectionLineOpacity(conn.opacity);
-                            setCustomConnectionLineThickness(conn.thickness);
-                          }
-                        }}
-                      >
-                        {THEME_PRESETS.map((preset) => (
-                          <option key={preset.id} value={preset.id}>
-                            {preset.label}
-                          </option>
-                        ))}
-                      </select>
-                      <p className="text-xs text-emerald-700">
-                        {selectedThemeId === baseThemeId
-                          ? THEME_PRESETS.find((preset) => preset.id === selectedThemeId)
-                              ?.description
-                          : 'Custom palette based on your selected theme.'}
-                      </p>
-                      <div className="mt-2 grid grid-cols-2 gap-3 pb-4">
-                        <div className="space-y-1">
-                          <label className="text-xs font-semibold text-emerald-900">
-                            Event colour
-                          </label>
-                          <input
-                            type="color"
-                            className="h-8 min-h-[44px] w-full rounded-md border border-emerald-100 bg-white/70 touch-manipulation"
-                            value={customEventColor}
-                            onChange={(e) => {
-                              setCustomEventColor(e.target.value);
-                              if (selectedThemeId === baseThemeId) {
-                                setSelectedThemeId('custom');
-                              }
-                            }}
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-xs font-semibold text-emerald-900">
-                            Person colour
-                          </label>
-                          <input
-                            type="color"
-                            className="h-8 min-h-[44px] w-full rounded-md border border-emerald-100 bg-white/70 touch-manipulation"
-                            value={customPersonColor}
-                            onChange={(e) => {
-                              setCustomPersonColor(e.target.value);
-                              if (selectedThemeId === baseThemeId) {
-                                setSelectedThemeId('custom');
-                              }
-                            }}
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-xs font-semibold text-emerald-900">
-                            Space colour
-                          </label>
-                          <input
-                            type="color"
-                            className="h-8 min-h-[44px] w-full rounded-md border border-emerald-100 bg-white/70 touch-manipulation"
-                            value={customSpaceColor}
-                            onChange={(e) => {
-                              setCustomSpaceColor(e.target.value);
-                              if (selectedThemeId === baseThemeId) {
-                                setSelectedThemeId('custom');
-                              }
-                            }}
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-xs font-semibold text-emerald-900">
-                            Group colour
-                          </label>
-                          <input
-                            type="color"
-                            className="h-8 min-h-[44px] w-full rounded-md border border-emerald-100 bg-white/70 touch-manipulation"
-                            value={customCommunityColor}
-                            onChange={(e) => {
-                              setCustomCommunityColor(e.target.value);
-                              if (selectedThemeId === baseThemeId) {
-                                setSelectedThemeId('custom');
-                              }
-                            }}
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-xs font-semibold text-emerald-900">
-                            Media colour
-                          </label>
-                          <input
-                            type="color"
-                            className="h-8 min-h-[44px] w-full rounded-md border border-emerald-100 bg-white/70 touch-manipulation"
-                            value={customMediaColor}
-                            onChange={(e) => {
-                              setCustomMediaColor(e.target.value);
-                              if (selectedThemeId === baseThemeId) {
-                                setSelectedThemeId('custom');
-                              }
-                            }}
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-xs font-semibold text-emerald-900">
-                            Region colour
-                          </label>
-                          <input
-                            type="color"
-                            className="h-8 min-h-[44px] w-full rounded-md border border-emerald-100 bg-white/70 touch-manipulation"
-                            value={customRegionColor}
-                            onChange={(e) => {
-                              setCustomRegionColor(e.target.value);
-                              if (selectedThemeId === baseThemeId) {
-                                setSelectedThemeId('custom');
-                              }
-                            }}
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-xs font-semibold text-emerald-900">
-                            Background colour
-                          </label>
-                          <input
-                            type="color"
-                            className="h-8 min-h-[44px] w-full rounded-md border border-emerald-100 bg-white/70 touch-manipulation"
-                            value={customMapBackgroundColor}
-                            onChange={(e) => {
-                              setCustomMapBackgroundColor(e.target.value);
-                              if (selectedThemeId === baseThemeId) {
-                                setSelectedThemeId('custom');
-                              }
-                            }}
-                          />
-                          <p className="text-[10px] text-emerald-700">
-                            Colour behind the map image
-                          </p>
-                        </div>
-                        <div className="space-y-1 col-span-2">
-                          <label className="text-xs font-semibold text-emerald-900">
-                            Region font
-                          </label>
+                      <div className="p-4 pt-0 space-y-4">
+                        <div className="space-y-2">
+                          <label className="text-xs font-semibold text-emerald-900">Map template</label>
                           <select
-                            className="w-full h-8 rounded-md border border-emerald-100 bg-white/70 text-sm text-emerald-900"
-                            value={customRegionFont}
+                            className="w-full bg-white/70 border border-emerald-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-400"
+                            value={mapTemplateId ?? DEFAULT_MAP_TEMPLATE_ID}
                             onChange={(e) => {
-                              setCustomRegionFont(e.target.value);
-                              if (selectedThemeId === baseThemeId) {
-                                setSelectedThemeId('custom');
+                              const id = e.target.value as SceneMap['mapTemplateId'];
+                              setMapTemplateId(id);
+                              const built = buildElementConfig(id ?? DEFAULT_MAP_TEMPLATE_ID, elementConfig ?? undefined, enabledNodeTypes);
+                              setElementConfig(built);
+                            }}
+                          >
+                            {MAP_TEMPLATES.map((t) => (
+                              <option key={t.id} value={t.id}>{t.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-xs font-semibold text-emerald-900">Theme (colours)</label>
+                          <select
+                            className="w-full bg-white/70 border border-emerald-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-400"
+                            value={selectedThemeId}
+                            onChange={(e) => {
+                              const id = e.target.value;
+                              setSelectedThemeId(id);
+                              setBaseThemeId(id);
+                              const preset = THEME_PRESETS.find((p) => p.id === id) ?? DEFAULT_THEME;
+                              const cat = preset.theme.categoryColors;
+                              if (cat) {
+                                setCustomEventColor(cat[NodeType.EVENT] || customEventColor);
+                                setCustomPersonColor(cat[NodeType.PERSON] || customPersonColor);
+                                setCustomSpaceColor(cat[NodeType.SPACE] || customSpaceColor);
+                                setCustomCommunityColor(cat[NodeType.COMMUNITY] || customCommunityColor);
+                                setCustomRegionColor(cat[NodeType.REGION] || customRegionColor);
+                                setCustomMediaColor(cat[NodeType.MEDIA] || customMediaColor);
+                              }
+                              setCustomMapBackgroundColor(preset.theme.backgroundColor ?? '#fdfcf0');
+                              setCustomRegionFont(preset.theme.regionFont ?? '');
+                              const conn = preset.theme.connectionLine;
+                              if (conn) {
+                                setCustomConnectionLineColor(conn.color);
+                                setCustomConnectionLineOpacity(conn.opacity);
+                                setCustomConnectionLineThickness(conn.thickness);
                               }
                             }}
                           >
-                            <option value="" style={{ fontFamily: 'Georgia, serif' }}>Default (Georgia, serif)</option>
-                            <option value="Georgia, serif" style={{ fontFamily: 'Georgia, serif' }}>Georgia</option>
-                            <option value="'Playfair Display', serif" style={{ fontFamily: "'Playfair Display', serif" }}>Playfair Display</option>
-                            <option value="'Outfit', sans-serif" style={{ fontFamily: "'Outfit', sans-serif" }}>Outfit</option>
-                            <option value="'Inter', sans-serif" style={{ fontFamily: "'Inter', sans-serif" }}>Inter</option>
-                            <option value="system-ui, sans-serif" style={{ fontFamily: 'system-ui, sans-serif' }}>System UI</option>
+                            {THEME_PRESETS.map((p) => (
+                              <option key={p.id} value={p.id}>{p.label}</option>
+                            ))}
                           </select>
                         </div>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-xs font-semibold text-emerald-900 block">
-                          Connection lines
-                        </label>
-                        <div className="grid grid-cols-3 gap-3">
-                          <div className="space-y-1">
-                            <label className="text-xs font-semibold text-emerald-900">
-                              Line colour
+
+                        <p className="text-xs text-emerald-700">Each element: include on map, icon & colour, label.</p>
+                        <div className="space-y-2">
+                          {elementOrder.map((type, idx) => {
+                            const label = getElementLabel(type, elementConfig ?? undefined, mapTemplateId ?? DEFAULT_MAP_TEMPLATE_ID);
+                            const icon = getElementIcon(type, elementConfig ?? undefined, mapTemplateId ?? DEFAULT_MAP_TEMPLATE_ID);
+                            const enabled = elementConfig?.[type]?.enabled ?? enabledNodeTypes.includes(type);
+                            const colorMap: Record<NodeType, string> = {
+                              [NodeType.EVENT]: customEventColor,
+                              [NodeType.PERSON]: customPersonColor,
+                              [NodeType.SPACE]: customSpaceColor,
+                              [NodeType.COMMUNITY]: customCommunityColor,
+                              [NodeType.REGION]: customRegionColor,
+                              [NodeType.MEDIA]: customMediaColor,
+                            };
+                            const color = colorMap[type];
+                            const setColor = (v: string) => {
+                              if (type === NodeType.EVENT) setCustomEventColor(v);
+                              if (type === NodeType.PERSON) setCustomPersonColor(v);
+                              if (type === NodeType.SPACE) setCustomSpaceColor(v);
+                              if (type === NodeType.COMMUNITY) setCustomCommunityColor(v);
+                              if (type === NodeType.REGION) setCustomRegionColor(v);
+                              if (type === NodeType.MEDIA) setCustomMediaColor(v);
+                              if (selectedThemeId === baseThemeId) setSelectedThemeId('custom');
+                            };
+                            const IconComp = getIconComponent(icon);
+                            const isCustomImg = icon && (icon.startsWith('data:') || icon.startsWith('http'));
+                            return (
+                              <div key={type} className={`flex items-center gap-3 p-3 rounded-xl border ${enabled ? 'bg-white/70 border-emerald-100' : 'bg-emerald-50/50 border-emerald-50 opacity-50'}`}>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <button type="button" onClick={() => { if (idx > 0) setElementOrder((o) => { const n = [...o]; [n[idx - 1], n[idx]] = [n[idx], n[idx - 1]]; return n; }); }} className="p-1 rounded hover:bg-emerald-100 text-emerald-600" aria-label="Move up"><ChevronDown className="w-4 h-4 rotate-180" /></button>
+                                  <button type="button" onClick={() => { if (idx < elementOrder.length - 1) setElementOrder((o) => { const n = [...o]; [n[idx], n[idx + 1]] = [n[idx + 1], n[idx]]; return n; }); }} className="p-1 rounded hover:bg-emerald-100 text-emerald-600" aria-label="Move down"><ChevronDown className="w-4 h-4" /></button>
+                                </div>
+                                <label className="flex items-center gap-2 shrink-0 cursor-pointer">
+                                  <input type="checkbox" checked={enabled} onChange={(e) => { const v = e.target.checked; setElementConfig((c) => ({ ...c, [type]: { ...(c?.[type] ?? { label, icon, enabled }), enabled: v } })); setEnabledNodeTypes((prev) => v ? [...prev, type].sort() : prev.filter((t) => t !== type)); }} className="rounded border-emerald-300 text-emerald-600" />
+                                  <span className="text-xs font-medium text-emerald-900">Include</span>
+                                </label>
+                                <button type="button" onClick={() => { setElementPickerTarget({ type, colorKey: type }); setElementPickerFor('icon'); }} className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: color }}>
+                                  {isCustomImg ? <img src={icon} alt="" className="w-6 h-6 object-contain" /> : IconComp ? <IconComp className="w-5 h-5 text-white" strokeWidth={2.5} /> : <span className="text-white text-sm">?</span>}
+                                </button>
+                                <input type="text" value={elementConfig?.[type]?.label ?? label} onChange={(e) => setElementConfig((c) => ({ ...c, [type]: { ...(c?.[type] ?? { label, icon, enabled }), label: e.target.value } }))} className="flex-1 min-w-0 bg-white/70 border border-emerald-100 rounded-lg px-2 py-1.5 text-sm" placeholder={label} />
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        <div className="pt-3 border-t border-emerald-100">
+                          <p className="text-xs font-semibold text-emerald-900 mb-2">Region</p>
+                          <div className={`flex items-center gap-3 p-3 rounded-xl border ${enabledNodeTypes.includes(NodeType.REGION) ? 'bg-white/70 border-emerald-100' : 'bg-emerald-50/50 border-emerald-50 opacity-50'}`}>
+                            <label className="flex items-center gap-2 shrink-0 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={enabledNodeTypes.includes(NodeType.REGION)}
+                                onChange={(e) => {
+                                  const v = e.target.checked;
+                                  setElementConfig((c) => {
+                                    const existing = c?.[NodeType.REGION];
+                                    const base = existing ?? { label: getElementLabel(NodeType.REGION, c, mapTemplateId ?? DEFAULT_MAP_TEMPLATE_ID), icon: getElementIcon(NodeType.REGION, c, mapTemplateId ?? DEFAULT_MAP_TEMPLATE_ID), enabled: v };
+                                    return { ...c, [NodeType.REGION]: { ...base, enabled: v } };
+                                  });
+                                  setEnabledNodeTypes((prev) => (v ? [...prev, NodeType.REGION].sort() : prev.filter((t) => t !== NodeType.REGION)));
+                                }}
+                                className="rounded border-emerald-300 text-emerald-600"
+                              />
+                              <span className="text-xs font-medium text-emerald-900">Include</span>
                             </label>
+                            <button type="button" onClick={() => { setElementPickerTarget({ type: NodeType.REGION, colorKey: 'REGION' }); setElementPickerFor('icon'); }} className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: customRegionColor }}>
+                              {(() => { const ic = getElementIcon(NodeType.REGION, elementConfig, mapTemplateId); const isImg = ic && (ic.startsWith('data:') || ic.startsWith('http')); const Ic = getIconComponent(ic); return isImg ? <img src={ic} alt="" className="w-6 h-6 object-contain" /> : Ic ? <Ic className="w-5 h-5 text-white" strokeWidth={2.5} /> : <span className="text-white text-sm">?</span>; })()}
+                            </button>
                             <input
-                              type="color"
-                              className="h-8 min-h-[44px] w-full rounded-md border border-emerald-100 bg-white/70 touch-manipulation"
-                              value={customConnectionLineColor}
+                              type="text"
+                              value={elementConfig?.[NodeType.REGION]?.label ?? getElementLabel(NodeType.REGION, elementConfig, mapTemplateId ?? DEFAULT_MAP_TEMPLATE_ID)}
                               onChange={(e) => {
-                                setCustomConnectionLineColor(e.target.value);
-                                if (selectedThemeId === baseThemeId) setSelectedThemeId('custom');
+                                const val = e.target.value;
+                                setElementConfig((c) => {
+                                  const existing = c?.[NodeType.REGION];
+                                  const base = existing ?? { label: getElementLabel(NodeType.REGION, c, mapTemplateId ?? DEFAULT_MAP_TEMPLATE_ID), icon: getElementIcon(NodeType.REGION, c, mapTemplateId ?? DEFAULT_MAP_TEMPLATE_ID), enabled: enabledNodeTypes.includes(NodeType.REGION) };
+                                  return { ...c, [NodeType.REGION]: { ...base, label: val } };
+                                });
                               }}
+                              className="flex-1 min-w-0 bg-white/70 border border-emerald-100 rounded-lg px-2 py-1.5 text-sm"
+                              placeholder="Regions"
                             />
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-xs font-semibold text-emerald-900">
-                              Opacity
-                            </label>
-                            <input
-                              type="range"
-                              min={0}
-                              max={1}
-                              step={0.1}
-                              className="w-full min-h-[44px] touch-manipulation"
-                              value={customConnectionLineOpacity}
-                              onChange={(e) => {
-                                setCustomConnectionLineOpacity(Number(e.target.value));
-                                if (selectedThemeId === baseThemeId) setSelectedThemeId('custom');
-                              }}
-                            />
-                            <span className="text-[10px] text-emerald-700">
-                              {Math.round(customConnectionLineOpacity * 100)}%
-                            </span>
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-xs font-semibold text-emerald-900">
-                              Thickness
-                            </label>
-                            <input
-                              type="number"
-                              min={1}
-                              max={6}
-                              className="w-full min-h-[44px] bg-white/70 border border-emerald-100 rounded-md px-2 text-sm touch-manipulation"
-                              value={customConnectionLineThickness}
-                              onChange={(e) => {
-                                const v = Number(e.target.value);
-                                if (v >= 1 && v <= 6) {
-                                  setCustomConnectionLineThickness(v);
-                                  if (selectedThemeId === baseThemeId) setSelectedThemeId('custom');
-                                }
-                              }}
-                            />
+                            <select className="shrink-0 bg-white/70 border border-emerald-100 rounded-lg px-2 py-1.5 text-xs" value={customRegionFont} onChange={(e) => { setCustomRegionFont(e.target.value); if (selectedThemeId === baseThemeId) setSelectedThemeId('custom'); }}>
+                              <option value="">Default</option>
+                              <option value="Georgia, serif">Georgia</option>
+                              <option value="'Playfair Display', serif">Playfair Display</option>
+                              <option value="'Outfit', sans-serif">Outfit</option>
+                              <option value="'Inter', sans-serif">Inter</option>
+                              <option value="system-ui, sans-serif">System UI</option>
+                            </select>
                           </div>
                         </div>
-                      </div>
-                    </div>
+
+                        <div className="pt-3 border-t border-emerald-100">
+                          <p className="text-xs font-semibold text-emerald-900 mb-2">Connections</p>
+                          <div className={`flex items-center gap-3 p-3 rounded-xl border ${connectionsEnabled ? 'bg-white/70 border-emerald-100' : 'bg-emerald-50/50 border-emerald-50 opacity-50'}`}>
+                            <label className="flex items-center gap-2 shrink-0 cursor-pointer">
+                              <input type="checkbox" checked={connectionsEnabled} onChange={(e) => setConnectionsEnabled(e.target.checked)} className="rounded border-emerald-300 text-emerald-600" />
+                              <span className="text-xs font-medium text-emerald-900">Include</span>
+                            </label>
+                            <button type="button" onClick={() => { setElementPickerTarget({ type: 'CONNECTION', colorKey: 'connection' }); setElementPickerFor('icon'); }} className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: customConnectionLineColor }}>
+                              {(() => { const ic = connectionConfig?.icon ?? MAP_TEMPLATES.find((t) => t.id === (mapTemplateId ?? DEFAULT_MAP_TEMPLATE_ID))?.connectionIcon ?? 'Link2'; const isImg = ic && (ic.startsWith('data:') || ic.startsWith('http')); const Ic = getIconComponent(ic); return isImg ? <img src={ic} alt="" className="w-6 h-6 object-contain" /> : Ic ? <Ic className="w-5 h-5 text-white" strokeWidth={2.5} /> : <span className="text-white text-sm">?</span>; })()}
+                            </button>
+                            <input type="text" value={connectionConfig?.label ?? MAP_TEMPLATES.find((t) => t.id === (mapTemplateId ?? DEFAULT_MAP_TEMPLATE_ID))?.connectionLabel ?? 'Connections'} onChange={(e) => setConnectionConfig((c) => ({ ...c, label: e.target.value }))} className="flex-1 min-w-0 bg-white/70 border border-emerald-100 rounded-lg px-2 py-1.5 text-sm" placeholder="Connections" />
+                            <div className="flex items-center gap-2 shrink-0">
+                              <input type="color" className="h-8 w-12 rounded border border-emerald-100" value={customConnectionLineColor} onChange={(e) => { setCustomConnectionLineColor(e.target.value); if (selectedThemeId === baseThemeId) setSelectedThemeId('custom'); }} />
+                              <input type="range" min={0} max={1} step={0.1} className="w-16" value={customConnectionLineOpacity} onChange={(e) => { setCustomConnectionLineOpacity(Number(e.target.value)); if (selectedThemeId === baseThemeId) setSelectedThemeId('custom'); }} />
+                              <span className="text-[10px] w-8">{Math.round(customConnectionLineOpacity * 100)}%</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2 pt-2">
+                          <label className="text-xs font-semibold text-emerald-900">Background colour</label>
+                          <div className="flex gap-2 items-center">
+                            <input type="color" className="h-8 w-16 rounded border border-emerald-100" value={customMapBackgroundColor} onChange={(e) => { setCustomMapBackgroundColor(e.target.value); if (selectedThemeId === baseThemeId) setSelectedThemeId('custom'); }} />
+                            <span className="text-xs text-emerald-700">Colour behind the map image</span>
+                          </div>
+                        </div>
                       </div>
                       )}
                     </div>
@@ -1075,46 +1040,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                       </button>
                       {rolesSectionOpen && (
                       <div className="p-4 pt-4 space-y-2">
-                    <div className="space-y-2 pb-4">
-                      <label className="text-sm font-semibold text-emerald-900 block">
-                        Show on map
-                      </label>
-                      <p className="text-xs text-emerald-700">
-                        Disabled types are hidden from the map, filter panel, and add-entry options.
-                      </p>
-                      <div className="flex flex-wrap gap-4">
-                        {Object.values(NodeType).map((type) => (
-                          <label
-                            key={type}
-                            className="flex items-center gap-2 cursor-pointer text-sm text-emerald-900"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={enabledNodeTypes.includes(type)}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setEnabledNodeTypes((prev) => [...prev, type].sort());
-                                } else {
-                                  setEnabledNodeTypes((prev) => prev.filter((t) => t !== type));
-                                }
-                              }}
-                              className="rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
-                            />
-                            {NODE_TYPE_LABELS[type]}
-                          </label>
-                        ))}
-                        <label className="flex items-center gap-2 cursor-pointer text-sm text-emerald-900">
-                          <input
-                            type="checkbox"
-                            checked={connectionsEnabled}
-                            onChange={(e) => setConnectionsEnabled(e.target.checked)}
-                            className="rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
-                          />
-                          Connections
-                        </label>
-                      </div>
-                    </div>
-                    <div className="pt-3 border-t border-emerald-100 space-y-3">
+                    <div className="pt-0 space-y-3">
                       <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-emerald-900">
                         <input
                           type="checkbox"
@@ -1878,7 +1804,70 @@ const Dashboard: React.FC<DashboardProps> = ({
         </div>
       )}
 
-      {/* Icon picker modal */}
+      {/* Element/Connection icon picker modal */}
+      {elementPickerFor === 'icon' && elementPickerTarget && (
+        <ElementIconPicker
+          value={
+            elementPickerTarget.type === 'CONNECTION'
+              ? (connectionConfig?.icon ?? MAP_TEMPLATES.find((t) => t.id === (mapTemplateId ?? DEFAULT_MAP_TEMPLATE_ID))?.connectionIcon ?? 'Link2')
+              : getElementIcon(elementPickerTarget.type as NodeType, elementConfig, mapTemplateId ?? DEFAULT_MAP_TEMPLATE_ID)
+          }
+          onChange={(icon) => {
+            if (elementPickerTarget.type === 'CONNECTION') {
+              setConnectionConfig((c) => ({ ...c, icon }));
+            } else {
+              const type = elementPickerTarget.type as NodeType;
+              const label = getElementLabel(type, elementConfig, mapTemplateId ?? DEFAULT_MAP_TEMPLATE_ID);
+              const enabled = elementConfig?.[type]?.enabled ?? enabledNodeTypes.includes(type);
+              setElementConfig((c) => ({ ...c, [type]: { ...(c?.[type] ?? { label, icon, enabled }), icon } }));
+            }
+          }}
+          backgroundColor={
+            elementPickerTarget.type === 'CONNECTION'
+              ? customConnectionLineColor
+              : {
+                  [NodeType.EVENT]: customEventColor,
+                  [NodeType.PERSON]: customPersonColor,
+                  [NodeType.SPACE]: customSpaceColor,
+                  [NodeType.COMMUNITY]: customCommunityColor,
+                  [NodeType.REGION]: customRegionColor,
+                  [NodeType.MEDIA]: customMediaColor,
+                }[elementPickerTarget.type as NodeType]
+          }
+          color={
+            elementPickerTarget.type === 'CONNECTION'
+              ? customConnectionLineColor
+              : {
+                  [NodeType.EVENT]: customEventColor,
+                  [NodeType.PERSON]: customPersonColor,
+                  [NodeType.SPACE]: customSpaceColor,
+                  [NodeType.COMMUNITY]: customCommunityColor,
+                  [NodeType.REGION]: customRegionColor,
+                  [NodeType.MEDIA]: customMediaColor,
+                }[elementPickerTarget.type as NodeType]
+          }
+          onColorChange={(color) => {
+            if (elementPickerTarget.type === 'CONNECTION') {
+              setCustomConnectionLineColor(color);
+            } else {
+              const type = elementPickerTarget.type as NodeType;
+              if (type === NodeType.EVENT) setCustomEventColor(color);
+              if (type === NodeType.PERSON) setCustomPersonColor(color);
+              if (type === NodeType.SPACE) setCustomSpaceColor(color);
+              if (type === NodeType.COMMUNITY) setCustomCommunityColor(color);
+              if (type === NodeType.REGION) setCustomRegionColor(color);
+              if (type === NodeType.MEDIA) setCustomMediaColor(color);
+            }
+            if (selectedThemeId === baseThemeId) setSelectedThemeId('custom');
+          }}
+          onClose={() => {
+            setElementPickerFor(null);
+            setElementPickerTarget(null);
+          }}
+        />
+      )}
+
+      {/* Map icon picker modal */}
       {showIconPicker && (
         <div
           className="fixed inset-0 z-[65] flex items-center justify-center p-4 bg-emerald-950/30 backdrop-blur-sm"

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { MapNode, MapTheme } from '../types';
-import { NODE_TYPE_LABELS } from '../constants';
+import { getElementLabel } from '../lib/element-config';
 import { X, ExternalLink, ScrollText, Pencil, Trash2 } from 'lucide-react';
 
 interface NodePopupProps {
@@ -10,6 +10,8 @@ interface NodePopupProps {
   onClose: () => void;
   mapTheme?: MapTheme;
   userRole?: string;
+  elementConfig?: import('../types').SceneMap['elementConfig'];
+  mapTemplateId?: import('../types').SceneMap['mapTemplateId'];
   onEditNode?: (node: MapNode) => void;
   onRequestDeleteNode?: (node: MapNode) => void;
 }
@@ -22,6 +24,8 @@ const NodePopup: React.FC<NodePopupProps> = ({
   userRole,
   onEditNode,
   onRequestDeleteNode,
+  elementConfig,
+  mapTemplateId = 'scene',
 }) => {
   const [popupWidth, setPopupWidth] = useState(380);
   useEffect(() => {
@@ -58,7 +62,7 @@ const NodePopup: React.FC<NodePopupProps> = ({
               }}
             />
             <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-800">
-              {NODE_TYPE_LABELS[node.type] ?? node.type}
+              {getElementLabel(node.type, elementConfig, mapTemplateId)}
             </span>
             {node.status === 'pending' && (
               <span className="ml-2 px-2 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-widest bg-amber-50 text-amber-800 border border-amber-200">

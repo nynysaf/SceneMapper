@@ -147,6 +147,20 @@ export interface SceneMap {
    * Background colour for the custom icon.
    */
   iconBackground?: string;
+  /**
+   * Map template (Scene, Ideas, Network) for default labels/icons.
+   * Default 'scene'.
+   */
+  mapTemplateId?: 'scene' | 'ideas' | 'network';
+  /**
+   * Per-element display config: labels, icons, enabled. When absent, use template defaults.
+   * Keys: EVENT, PERSON, SPACE, COMMUNITY, REGION, MEDIA.
+   */
+  elementConfig?: Partial<Record<NodeType, { label: string; icon: string; enabled: boolean }>>;
+  /**
+   * Connection display config: label, icon. Color/opacity/thickness stay in theme.connectionLine.
+   */
+  connectionConfig?: { label?: string; icon?: string };
 }
 
 /**

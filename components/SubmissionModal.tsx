@@ -1,5 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { NodeType, MapNode, MapConnection } from '../types';
+import { getElementLabel, MAP_TEMPLATES } from '../lib/element-config';
+import { getIconComponent } from '../lib/icons';
 import { X, MapPin, AlertCircle, Link } from 'lucide-react';
 
 /** Submission is either a node (Event/Person/Space/Community) or a connection. null = not yet selected. */
@@ -18,6 +20,9 @@ interface SubmissionModalProps {
   connectionsEnabled?: boolean;
   /** When set, opens with this category/kind preselected. */
   presetKind?: NodeType | 'CONNECTION' | null;
+  elementConfig?: import('../types').SceneMap['elementConfig'];
+  mapTemplateId?: import('../types').SceneMap['mapTemplateId'];
+  connectionConfig?: import('../types').SceneMap['connectionConfig'];
 }
 
 const SubmissionModal: React.FC<SubmissionModalProps> = ({
@@ -29,6 +34,9 @@ const SubmissionModal: React.FC<SubmissionModalProps> = ({
   enabledNodeTypes,
   connectionsEnabled = true,
   presetKind = null,
+  elementConfig,
+  mapTemplateId = 'scene',
+  connectionConfig,
 }) => {
   const [submissionKind, setSubmissionKind] = useState<SubmissionKind>(presetKind ?? null);
   const [formData, setFormData] = useState<Partial<MapNode>>({
@@ -113,23 +121,26 @@ const SubmissionModal: React.FC<SubmissionModalProps> = ({
             <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
               {(enabledNodeTypes ?? Object.values(NodeType))
                 .filter((type) => type !== NodeType.REGION || userRole === 'admin')
-                .map(type => (
-                <button
-                  key={type}
-                  type="button"
-                  onClick={() => {
-                    setSubmissionKind(type);
-                    setFormData((prev) => ({ ...prev, type }));
-                  }}
-                  className={`py-2 px-1 rounded-xl text-[10px] font-bold border-2 transition-all ${
-                    submissionKind === type
-                      ? 'bg-emerald-600 border-emerald-600 text-white'
-                      : 'border-emerald-100 text-emerald-700 hover:border-emerald-300'
-                  }`}
-                >
-                  {type}
-                </button>
-              ))}
+                .map(type => {
+                  const label = getElementLabel(type, elementConfig, mapTemplateId);
+                  return (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => {
+                        setSubmissionKind(type);
+                        setFormData((prev) => ({ ...prev, type }));
+                      }}
+                      className={`py-2 px-1 rounded-xl text-[10px] font-bold border-2 transition-all ${
+                        submissionKind === type
+                          ? 'bg-emerald-600 border-emerald-600 text-white'
+                          : 'border-emerald-100 text-emerald-700 hover:border-emerald-300'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
               {connectionsEnabled && (
                 <button
                   type="button"
@@ -140,7 +151,7 @@ const SubmissionModal: React.FC<SubmissionModalProps> = ({
                       : 'border-emerald-100 text-emerald-700 hover:border-emerald-300'
                   }`}
                 >
-                  CONNECTION
+                  {connectionConfig?.label ?? MAP_TEMPLATES.find((t) => t.id === mapTemplateId)?.connectionLabel ?? 'Connections'}
                 </button>
               )}
             </div>

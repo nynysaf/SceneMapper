@@ -41,6 +41,9 @@ export interface DbMap {
   connections_enabled: boolean | null;
   icon: string | null;
   icon_background: string | null;
+  map_template_id: string | null;
+  element_config: Record<string, unknown> | null;
+  connection_config: Record<string, unknown> | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -119,8 +122,14 @@ export function dbMapToSceneMap(row: DbMap): SceneMap {
     invitationSenderName: row.invitation_sender_name ?? undefined,
     nodeSizeScale: row.node_size_scale ?? undefined,
     nodeLabelFontScale: row.node_label_font_scale ?? undefined,
+    regionFontScale: row.region_font_scale != null ? Number(row.region_font_scale) : undefined,
+    enabledNodeTypes: (row.enabled_node_types ?? undefined) as SceneMap['enabledNodeTypes'],
+    connectionsEnabled: row.connections_enabled ?? undefined,
     icon: row.icon ?? undefined,
     iconBackground: row.icon_background ?? undefined,
+    mapTemplateId: (row.map_template_id ?? undefined) as SceneMap['mapTemplateId'],
+    elementConfig: (row.element_config ?? undefined) as SceneMap['elementConfig'],
+    connectionConfig: (row.connection_config ?? undefined) as SceneMap['connectionConfig'],
   };
 }
 
@@ -185,6 +194,9 @@ export function sceneMapToDbMap(m: SceneMap): Omit<DbMap, 'created_at' | 'update
     connections_enabled: m.connectionsEnabled ?? null,
     icon: m.icon ?? null,
     icon_background: m.iconBackground ?? null,
+    map_template_id: m.mapTemplateId ?? null,
+    element_config: m.elementConfig ?? null,
+    connection_config: m.connectionConfig ?? null,
   };
 }
 

@@ -1,8 +1,9 @@
 
 import React from 'react';
 import { NodeType, MapNode, MapTheme } from '../types';
-import { NODE_TYPE_LABELS } from '../constants';
-import { X, ExternalLink, Calendar, MapPin, User, Building, Leaf, Globe, Pencil, Trash2, Settings2, Link2, QrCode, Download, Plus, FileDown, Check, Image } from 'lucide-react';
+import { getElementLabel, getElementIcon } from '../lib/element-config';
+import { getIconComponent } from '../lib/icons';
+import { X, ExternalLink, User, Leaf, Pencil, Trash2, Settings2, Link2, QrCode, Download, Plus, FileDown, Check } from 'lucide-react';
 
 /** Squiggly/curved line icon for connection filter (20px, matches other filter icons). */
 function ConnectionLineIcon({ size = 20, className }: { size?: number; className?: string }) {
@@ -58,6 +59,11 @@ interface SidebarProps {
   onExportRequested?: (format: 'csv' | 'xlsx') => void;
   /** Called when user clicks Plus to add a node; category is preset. Omit or falsy to hide Plus (e.g. public viewers). */
   onAddNode?: (category: NodeType | 'CONNECTION') => void;
+  /** Per-map element config for labels/icons. When absent, use template defaults. */
+  elementConfig?: import('../types').SceneMap['elementConfig'];
+  mapTemplateId?: import('../types').SceneMap['mapTemplateId'];
+  /** Connection label and icon. */
+  connectionConfig?: import('../types').SceneMap['connectionConfig'];
 }
 
 function Sidebar({
@@ -88,6 +94,9 @@ function Sidebar({
   onExportRequested,
   onAddNode,
   mapTitle,
+  elementConfig,
+  mapTemplateId = 'scene',
+  connectionConfig,
 }: SidebarProps) {
   const categoryColors = mapTheme?.categoryColors;
   const [isCollapsed, setIsCollapsed] = React.useState(false);
@@ -123,19 +132,23 @@ function Sidebar({
       setTimeout(() => setLinkCopied(false), 2000);
     });
   };
-  const allFilterOptions = [
-    { type: NodeType.EVENT, label: 'Events', icon: Calendar },
-    { type: NodeType.PERSON, label: 'People', icon: User },
-    { type: NodeType.SPACE, label: 'Spaces', icon: Building },
-    { type: NodeType.COMMUNITY, label: 'Groups', icon: Leaf },
-    { type: NodeType.REGION, label: 'Regions', icon: Globe },
-    { type: NodeType.MEDIA, label: 'Media', icon: Image },
-  ];
-  const filterOptions = (enabledNodeTypes
-    ? allFilterOptions.filter((o) => enabledNodeTypes.includes(o.type))
-    : allFilterOptions).filter((o) => o.type !== NodeType.REGION || userRole === 'admin');
+  const filterOptions = (enabledNodeTypes ?? [
+    NodeType.EVENT,
+    NodeType.PERSON,
+    NodeType.SPACE,
+    NodeType.COMMUNITY,
+    NodeType.REGION,
+    NodeType.MEDIA,
+  ])
+    .filter((type) => type !== NodeType.REGION || userRole === 'admin')
+    .map((type) => ({
+      type,
+      label: getElementLabel(type, elementConfig, mapTemplateId),
+      icon: getElementIcon(type, elementConfig, mapTemplateId),
+    }));
   const connectionLineColor =
     mapTheme?.connectionLine?.color ?? mapTheme?.primaryColor ?? '#059669';
+  const connectionLabel = connectionConfig?.label ?? 'Connections';
 
   const handleWidth = 28;
   return (
@@ -206,7 +219,7 @@ function Sidebar({
                               categoryColors?.[selectedNode.type] ?? '#059669',
                           }}
                         >
-                          {NODE_TYPE_LABELS[selectedNode.type] ?? selectedNode.type}
+                          {getElementLabel(selectedNode.type, elementConfig, mapTemplateId)}
                         </span>
                         {selectedNode.status === 'pending' && (
                           <span className="ml-2 px-2 py-1 rounded-full text-[9px] font-semibold uppercase tracking-widest bg-amber-50 text-amber-800 border border-amber-200">
@@ -293,8 +306,10 @@ function Sidebar({
         ) : (
           <div className="space-y-8">
             <div className="grid grid-cols-1 gap-3">
-              {filterOptions.map(({ type, label, icon: Icon }) => {
+              {filterOptions.map(({ type, label, icon: iconName }) => {
                 const isActive = activeFilters.includes(type);
+                const IconComponent = getIconComponent(iconName);
+                const isCustomImg = iconName && (iconName.startsWith('data:') || iconName.startsWith('http'));
                 return (
                   <div
                     key={type}
@@ -321,10 +336,16 @@ function Sidebar({
                       title={isActive ? 'Hide from map' : 'Show on map'}
                     >
                       <div
-                        className="w-9 h-9 rounded-lg flex items-center justify-center text-white shrink-0"
+                        className="w-9 h-9 rounded-lg flex items-center justify-center text-white shrink-0 overflow-hidden"
                         style={{ backgroundColor: categoryColors?.[type] ?? '#059669' }}
                       >
-                        <Icon size={18} />
+                        {isCustomImg ? (
+                          <img src={iconName} alt="" className="w-5 h-5 object-contain" />
+                        ) : IconComponent ? (
+                          <IconComponent size={18} />
+                        ) : (
+                          <span className="text-xs">?</span>
+                        )}
                       </div>
                       <span className="font-bold text-emerald-900 truncate flex-1">{label}</span>
                       <div
@@ -363,12 +384,23 @@ function Sidebar({
                     title={connectionsFilterOn ? 'Hide connections' : 'Show connections'}
                   >
                     <div
-                      className="w-9 h-9 rounded-lg flex items-center justify-center text-white shrink-0"
+                      className="w-9 h-9 rounded-lg flex items-center justify-center text-white shrink-0 overflow-hidden"
                       style={{ backgroundColor: connectionLineColor }}
                     >
-                      <ConnectionLineIcon size={18} className="text-white" />
+                      {(() => {
+                        const connIcon = connectionConfig?.icon ?? 'Link2';
+                        const isImg = connIcon && (connIcon.startsWith('data:') || connIcon.startsWith('http'));
+                        const ConnIconComp = getIconComponent(connIcon);
+                        return isImg ? (
+                          <img src={connIcon} alt="" className="w-5 h-5 object-contain" />
+                        ) : ConnIconComp ? (
+                          <ConnIconComp size={18} className="text-white" />
+                        ) : (
+                          <ConnectionLineIcon size={18} className="text-white" />
+                        );
+                      })()}
                     </div>
-                    <span className="font-bold text-emerald-900 truncate flex-1">Connections</span>
+                    <span className="font-bold text-emerald-900 truncate flex-1">{connectionLabel}</span>
                     <div
                       className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 ${
                         connectionsFilterOn ? 'border-emerald-500 bg-emerald-500' : 'border-emerald-200'

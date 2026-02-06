@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { MapNode, MapConnection, NodeType, UserSession, MapTheme, SceneMap, User, AuthSession } from '../types';
-import { INITIAL_NODES, CATEGORY_COLORS, DEFAULT_ENABLED_NODE_TYPES, NODE_TYPE_LABELS } from '../constants';
+import { INITIAL_NODES, CATEGORY_COLORS, DEFAULT_ENABLED_NODE_TYPES } from '../constants';
+import { getElementLabel } from '../lib/element-config';
 import { getNodes as loadNodes, saveNodes as persistNodes, getConnections as loadConnections, saveConnections as persistConnections, getSession, getMaps, saveMaps, isAbortError } from '../lib/data';
 import Map from './Map';
 import Sidebar from './Sidebar';
@@ -1017,6 +1018,8 @@ const MapExperience: React.FC<MapExperienceProps> = ({
             userRole={userSession.role}
             onEditNode={userSession.role === 'public' ? undefined : startEditNode}
             onRequestDeleteNode={userSession.role === 'admin' ? requestDeleteNode : undefined}
+            elementConfig={map?.elementConfig}
+            mapTemplateId={map?.mapTemplateId}
             />
           </>
         )}
@@ -1098,6 +1101,9 @@ const MapExperience: React.FC<MapExperienceProps> = ({
           setSubmissionPresetKind(category);
           setIsSubmissionOpen(true);
         }}
+        elementConfig={map?.elementConfig}
+        mapTemplateId={map?.mapTemplateId}
+        connectionConfig={map?.connectionConfig}
       />
 
       {/* Modals */}
@@ -1113,6 +1119,9 @@ const MapExperience: React.FC<MapExperienceProps> = ({
           userRole={userSession.role}
           enabledNodeTypes={enabledNodeTypes}
           connectionsEnabled={connectionsEnabled}
+          elementConfig={map?.elementConfig}
+          mapTemplateId={map?.mapTemplateId}
+          connectionConfig={map?.connectionConfig}
           approvedNodes={nodes.filter(
             (n) =>
               enabledNodeTypes.includes(n.type) &&
@@ -1137,6 +1146,8 @@ const MapExperience: React.FC<MapExperienceProps> = ({
           }}
           mapTheme={mapTheme}
           nodes={nodes}
+          elementConfig={map?.elementConfig}
+          mapTemplateId={map?.mapTemplateId}
         />
       )}
 
@@ -1179,7 +1190,7 @@ const MapExperience: React.FC<MapExperienceProps> = ({
                             : 'border-emerald-100 text-emerald-700 hover:border-emerald-300'
                         }`}
                       >
-                        {type}
+                        {getElementLabel(type, map?.elementConfig, map?.mapTemplateId)}
                       </button>
                     ))}
                 </div>

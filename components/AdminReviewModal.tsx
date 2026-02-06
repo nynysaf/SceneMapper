@@ -1,6 +1,6 @@
 import React from 'react';
 import { MapNode, MapConnection, MapTheme } from '../types';
-import { NODE_TYPE_LABELS } from '../constants';
+import { getElementLabel } from '../lib/element-config';
 import { X, Check, Trash2, Clock, MapPin, GitBranch, Pencil } from 'lucide-react';
 
 interface AdminReviewModalProps {
@@ -16,6 +16,8 @@ interface AdminReviewModalProps {
   mapTheme?: MapTheme;
   /** Nodes used to resolve connection from/to titles */
   nodes?: MapNode[];
+  elementConfig?: import('../types').SceneMap['elementConfig'];
+  mapTemplateId?: import('../types').SceneMap['mapTemplateId'];
 }
 
 const AdminReviewModal: React.FC<AdminReviewModalProps> = ({
@@ -29,6 +31,8 @@ const AdminReviewModal: React.FC<AdminReviewModalProps> = ({
   onEditNode,
   mapTheme,
   nodes = [],
+  elementConfig,
+  mapTemplateId = 'scene',
 }) => {
   const categoryColors = mapTheme?.categoryColors;
   const nodeById: Record<string, MapNode> = Object.fromEntries(nodes.map((n) => [n.id, n]));
@@ -80,7 +84,7 @@ const AdminReviewModal: React.FC<AdminReviewModalProps> = ({
                           backgroundColor: categoryColors?.[node.type] ?? '#059669',
                         }}
                       >
-                        {NODE_TYPE_LABELS[node.type] ?? node.type}
+                        {getElementLabel(node.type, elementConfig, mapTemplateId)}
                       </span>
                       <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
                         <MapPin size={10} />
