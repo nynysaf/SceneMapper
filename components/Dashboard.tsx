@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { User, SceneMap, MapTheme } from '../types';
 import { NodeType } from '../types';
-import { getMaps, saveMaps, copyNodesToSlug, saveNodes, isAbortError } from '../lib/data';
+import { getMaps, saveMaps, copyNodesToSlug, saveNodes, saveConnections, getConnections, isAbortError } from '../lib/data';
 import {
   DEFAULT_ADMIN_SUBJECT,
   DEFAULT_ADMIN_BODY,
@@ -257,6 +257,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [rolesSectionOpen, setRolesSectionOpen] = useState(false);
   const [advancedSectionOpen, setAdvancedSectionOpen] = useState(false);
   const [submitAsFeatured, setSubmitAsFeatured] = useState(false);
+  const [isDuplicating, setIsDuplicating] = useState(false);
 
   const copyMapLink = (map: SceneMap) => {
     if (typeof window === 'undefined') return;
@@ -1009,6 +1010,10 @@ const Dashboard: React.FC<DashboardProps> = ({
                               {(() => { const ic = connectionConfig?.icon ?? MAP_TEMPLATES.find((t) => t.id === (mapTemplateId ?? DEFAULT_MAP_TEMPLATE_ID))?.connectionIcon ?? 'Link2'; const isImg = ic && (ic.startsWith('data:') || ic.startsWith('http')); const Ic = getIconComponent(ic); return isImg ? <img src={ic} alt="" className="w-6 h-6 object-contain" /> : Ic ? <Ic className="w-5 h-5 text-white" strokeWidth={2.5} /> : <span className="text-white text-sm">?</span>; })()}
                             </button>
                             <input type="text" value={connectionConfig?.label ?? MAP_TEMPLATES.find((t) => t.id === (mapTemplateId ?? DEFAULT_MAP_TEMPLATE_ID))?.connectionLabel ?? 'Connections'} onChange={(e) => setConnectionConfig((c) => ({ ...c, label: e.target.value }))} className="flex-1 min-w-0 bg-white/70 border border-emerald-100 rounded-lg px-2 py-1.5 text-sm" placeholder="Connections" />
+                            <div className="flex items-center gap-2 shrink-0">
+                              <input type="range" min={0} max={1} step={0.1} className="w-16" value={customConnectionLineOpacity} onChange={(e) => { setCustomConnectionLineOpacity(Number(e.target.value)); if (selectedThemeId === baseThemeId) setSelectedThemeId('custom'); }} />
+                              <span className="text-[10px] w-8">{Math.round(customConnectionLineOpacity * 100)}%</span>
+                            </div>
                           </div>
                         </div>
 
@@ -1131,6 +1136,90 @@ const Dashboard: React.FC<DashboardProps> = ({
                         <p className="text-xs text-emerald-700 -mt-1">
                           Proud of your map? Share it to inspire others!
                         </p>
+                        {editingMapId && editingOriginalSlug && (
+                          <div className="pt-4">
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                if (!currentUser || !editingOriginalSlug) return;
+                                setIsDuplicating(true);
+                                setMapError(null);
+                                try {
+                                  const dupTitle = `Copy of ${mapTitle.trim() || 'Untitled map'}`;
+                                  let baseSlug = (mapSlug.trim() || slugify(mapTitle || 'untitled')).toLowerCase();
+                                  if (!baseSlug) baseSlug = 'new-map';
+                                  const baseSlugDup = `copy-of-${baseSlug}`;
+                                  let slug = baseSlugDup;
+                                  let n = 1;
+                                  while (maps.some((m) => m.slug === slug)) {
+                                    slug = `${baseSlugDup}-${n}`;
+                                    n++;
+                                  }
+                                  const selectedPreset = THEME_PRESETS.find((p) => p.id === selectedThemeId) ?? DEFAULT_THEME;
+                                  const selectedTheme: MapTheme = {
+                                    ...selectedPreset.theme,
+                                    backgroundColor: customMapBackgroundColor,
+                                    categoryColors: {
+                                      [NodeType.EVENT]: customEventColor,
+                                      [NodeType.PERSON]: customPersonColor,
+                                      [NodeType.SPACE]: customSpaceColor,
+                                      [NodeType.COMMUNITY]: customCommunityColor,
+                                      [NodeType.REGION]: customRegionColor,
+                                      [NodeType.MEDIA]: customMediaColor,
+                                    },
+                                    regionFont: customRegionFont || undefined,
+                                    connectionLine: {
+                                      color: customConnectionLineColor,
+                                      opacity: customConnectionLineOpacity,
+                                      thickness: customConnectionLineThickness,
+                                    },
+                                  };
+                                  const newMap: SceneMap = {
+                                    id: crypto.randomUUID(),
+                                    slug,
+                                    title: dupTitle,
+                                    description: mapDescription.trim(),
+                                    backgroundImageUrl: maps.find((m) => m.id === editingMapId)?.backgroundImageUrl,
+                                    theme: selectedTheme,
+                                    adminIds: [currentUser.id],
+                                    collaboratorIds: [],
+                                    publicView: true,
+                                    themeId: selectedThemeId === baseThemeId ? selectedPreset.id : 'custom',
+                                    enabledNodeTypes: enabledNodeTypes.length < 4 ? enabledNodeTypes : undefined,
+                                    connectionsEnabled: connectionsEnabled ? undefined : false,
+                                    icon: mapIcon || undefined,
+                                    iconBackground: mapIconBackground || undefined,
+                                    mapTemplateId: mapTemplateId ?? DEFAULT_MAP_TEMPLATE_ID,
+                                    elementConfig: elementConfig ?? undefined,
+                                    connectionConfig: connectionConfig ?? undefined,
+                                    nodeSizeScale: maps.find((m) => m.id === editingMapId)?.nodeSizeScale,
+                                    nodeLabelFontScale: maps.find((m) => m.id === editingMapId)?.nodeLabelFontScale,
+                                    regionFontScale: maps.find((m) => m.id === editingMapId)?.regionFontScale,
+                                  };
+                                  const nextMaps = [...maps, newMap];
+                                  await saveMaps(nextMaps);
+                                  await copyNodesToSlug(editingOriginalSlug, slug);
+                                  const connections = await getConnections(editingOriginalSlug);
+                                  if (connections.length > 0) {
+                                    await saveConnections(slug, connections);
+                                  }
+                                  onNavigate(`/maps/${slug}`);
+                                } catch (err) {
+                                  setMapError(err instanceof Error ? err.message : 'Could not duplicate map. Please try again.');
+                                } finally {
+                                  setIsDuplicating(false);
+                                }
+                              }}
+                              disabled={isDuplicating}
+                              className="w-full py-2.5 rounded-xl text-sm font-semibold bg-emerald-100 text-emerald-800 hover:bg-emerald-200 transition-colors disabled:opacity-50"
+                            >
+                              {isDuplicating ? 'Duplicating...' : 'Duplicate map'}
+                            </button>
+                            <p className="text-xs text-emerald-700 mt-1.5">
+                              Creates a copy with the same content; permissions are reset.
+                            </p>
+                          </div>
+                        )}
                         <div className="space-y-2 pt-4 pb-6">
                           <label className="text-sm font-semibold text-emerald-900">
                             Upload data

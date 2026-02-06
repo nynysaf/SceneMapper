@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { X, Image } from 'lucide-react';
 import { ICON_NAMES, getIconComponent } from '@/lib/icons';
 
@@ -33,8 +33,21 @@ export default function ElementIconPicker({
   onColorChange,
   onClose,
 }: ElementIconPickerProps) {
+  const [activeGrid, setActiveGrid] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const isCustomImage = value && (value.startsWith('data:') || value.startsWith('http'));
   const iconGrids = chunk(ICON_NAMES, ICONS_PER_GRID);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const handler = () => {
+      const idx = Math.round(el.scrollLeft / (el.scrollWidth / iconGrids.length));
+      setActiveGrid(Math.min(idx, iconGrids.length - 1));
+    };
+    el.addEventListener('scroll', handler);
+    return () => el.removeEventListener('scroll', handler);
+  }, [iconGrids.length]);
 
   return (
     <div
@@ -104,8 +117,11 @@ export default function ElementIconPicker({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-emerald-900">Lucide icons</label>
-            <div className="flex overflow-x-auto gap-4 snap-x snap-mandatory scroll-smooth overscroll-x-contain touch-pan-x [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <label className="text-xs font-semibold text-emerald-900">Icon</label>
+            <div
+              ref={scrollRef}
+              className="flex overflow-x-auto gap-4 snap-x snap-mandatory scroll-smooth overscroll-x-contain touch-pan-x [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            >
               {iconGrids.map((icons, gridIdx) => (
                 <div
                   key={gridIdx}
@@ -130,6 +146,26 @@ export default function ElementIconPicker({
                     );
                   })}
                 </div>
+              ))}
+            </div>
+            <div className="flex justify-center gap-1.5 pt-2">
+              {iconGrids.map((_, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => {
+                    const el = scrollRef.current;
+                    if (el) {
+                      const w = el.scrollWidth / iconGrids.length;
+                      el.scrollTo({ left: idx * w, behavior: 'smooth' });
+                    }
+                    setActiveGrid(idx);
+                  }}
+                  className={`w-1.5 h-1.5 rounded-full transition-colors ${
+                    activeGrid === idx ? 'bg-emerald-600' : 'bg-emerald-200'
+                  }`}
+                  aria-label={`Page ${idx + 1} of ${iconGrids.length}`}
+                />
               ))}
             </div>
           </div>
