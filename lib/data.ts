@@ -78,12 +78,52 @@ async function getMapPageDataApi(slug: string, options?: DataLayerOptions): Prom
   return r.json();
 }
 
+/** Vercel serverless request body limit is 4.5 MB. Keep under 4 MB to be safe. */
+const SAVE_MAPS_BODY_LIMIT = 4 * 1024 * 1024;
+
 async function saveMapsApi(maps: SceneMap[]): Promise<void> {
-  const r = await fetch(`${apiBase()}/api/maps`, fetchOpts('POST', maps));
-  if (!r.ok) {
-    const body = await r.json().catch(() => ({}));
-    const msg = typeof (body as { error?: string }).error === 'string' ? (body as { error: string }).error : `saveMaps: ${r.status}`;
-    throw new Error(msg);
+  const body = JSON.stringify(maps);
+  if (body.length <= SAVE_MAPS_BODY_LIMIT) {
+    const r = await fetch(`${apiBase()}/api/maps`, fetchOpts('POST', maps));
+    if (!r.ok) {
+      const resBody = await r.json().catch(() => ({}));
+      const msg =
+        typeof (resBody as { error?: string }).error === 'string'
+          ? (resBody as { error: string }).error
+          : `saveMaps: ${r.status}`;
+      throw new Error(msg);
+    }
+    return;
+  }
+
+  // Chunk by size so each request stays under the limit (avoids 413 Payload Too Large).
+  const chunks: SceneMap[][] = [];
+  let current: SceneMap[] = [];
+  for (const m of maps) {
+    current.push(m);
+    if (JSON.stringify(current).length > SAVE_MAPS_BODY_LIMIT) {
+      current.pop();
+      if (current.length === 0) {
+        // Single map exceeds limit; send it anyway and let server/network handle or error
+        chunks.push([m]);
+      } else {
+        chunks.push(current);
+        current = [m];
+      }
+    }
+  }
+  if (current.length > 0) chunks.push(current);
+
+  for (const chunk of chunks) {
+    const r = await fetch(`${apiBase()}/api/maps`, fetchOpts('POST', chunk));
+    if (!r.ok) {
+      const resBody = await r.json().catch(() => ({}));
+      const msg =
+        typeof (resBody as { error?: string }).error === 'string'
+          ? (resBody as { error: string }).error
+          : `saveMaps: ${r.status}`;
+      throw new Error(msg);
+    }
   }
 }
 
