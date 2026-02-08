@@ -1386,10 +1386,10 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 setUploadResult(result);
                               } catch (err) {
                                 const msg = err instanceof Error ? err.message : 'Upload failed';
-                                const isPayloadOrNetwork = /413|payload|network|fetch/i.test(msg);
+                                const isPayloadTooLarge = /413|payload too large/i.test(msg);
                                 setUploadError(
-                                  isPayloadOrNetwork
-                                    ? 'Import failed (request too large or network). Try fewer rows or split your file.'
+                                  isPayloadTooLarge
+                                    ? 'Import failed (request too large). Try fewer rows or split your file.'
                                     : msg
                                 );
                               } finally {
