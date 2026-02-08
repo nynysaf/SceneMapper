@@ -20,7 +20,7 @@ export async function GET() {
     return NextResponse.json({
       userId: user.id,
       email,
-      name: user.user_metadata?.name ?? email || 'User',
+      name: user.user_metadata?.name ?? (email || 'User'),
       platformAdmin: isPlatformAdminEmail(email || null),
     });
   } catch {
