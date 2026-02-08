@@ -123,6 +123,7 @@ const Map: React.FC<MapProps> = ({
   mapBackgroundColor = '#fdfcf0',
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
+  const hasFittedInitialRef = useRef(false);
   const dragStartRef = useRef({ x: 0, y: 0 });
   const bulkDragStartRef = useRef<Record<string, { x: number; y: number }>>({});
   const connectionDragCleanupRef = useRef<(() => void) | null>(null);
@@ -173,6 +174,20 @@ const Map: React.FC<MapProps> = ({
       svg.on('.zoom', null);
     } else if (!isPlacing) {
       svg.call(zoom);
+      // Initial load: fit full map (1000×1000) to view, centered with padding
+      if (!hasFittedInitialRef.current) {
+        hasFittedInitialRef.current = true;
+        const padding = 0.05;
+        const k = 1 - 2 * padding;
+        const cx = 500;
+        const ty = cx * (1 - k);
+        const initial = d3.zoomIdentity.translate(ty, ty).scale(k);
+        requestAnimationFrame(() => {
+          if (svgRef.current) {
+            d3.select(svgRef.current).call(zoom.transform, initial);
+          }
+        });
+      }
     } else {
       svg.on('.zoom', null); // Disable zoom while placing to allow precise clicks
     }

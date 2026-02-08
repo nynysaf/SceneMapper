@@ -22,7 +22,7 @@ import {
 } from '../lib/element-config';
 import { getIconComponent } from '../lib/icons';
 import ElementIconPicker from './ElementIconPicker';
-import { Trash2, Link2, QrCode, Pencil, X, Plus, Upload, Download, Image, ChevronDown, ChevronRight, GripVertical, Loader2 } from 'lucide-react';
+import { Trash2, Link2, QrCode, Pencil, X, Plus, Upload, Download, Image, ChevronDown, ChevronRight, ChevronUp, GripVertical, Loader2 } from 'lucide-react';
 
 interface DashboardProps {
   onNavigate: (path: string) => void;
@@ -1729,7 +1729,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                           disabled={featuredReordering}
                           className="p-1 rounded hover:bg-emerald-100 text-emerald-700 disabled:opacity-50"
                         >
-                          <ChevronRight className="w-4 h-4 rotate-270" />
+                          <ChevronUp className="w-4 h-4" />
                         </button>
                         <button
                           type="button"
@@ -1751,7 +1751,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                           disabled={featuredReordering}
                           className="p-1 rounded hover:bg-emerald-100 text-emerald-700 disabled:opacity-50"
                         >
-                          <ChevronRight className="w-4 h-4 rotate-90" />
+                          <ChevronDown className="w-4 h-4" />
                         </button>
                       </li>
                     ))}
