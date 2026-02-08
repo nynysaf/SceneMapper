@@ -580,6 +580,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         setIsBuildingMap(false);
         return;
       }
+    }
 
     const selectedPreset =
       THEME_PRESETS.find((preset) => preset.id === selectedThemeId) ?? DEFAULT_THEME;
