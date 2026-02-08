@@ -39,6 +39,9 @@ export async function GET(_request: NextRequest, context: RouteContext) {
 /**
  * PUT /api/maps/[slug]/nodes
  * Replace all nodes for the map. Body: MapNode[].
+ * Preserves connections: connections reference nodes with ON DELETE CASCADE, so we
+ * fetch connections first, delete nodes (which would cascade-delete connections),
+ * insert nodes, then re-insert connections so they are not lost.
  */
 export async function PUT(request: NextRequest, context: RouteContext) {
   const { slug } = await context.params;
@@ -56,6 +59,13 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     }
     const nodes: MapNode[] = body;
 
+    const { data: existingConnections } = await supabase
+      .from('connections')
+      .select('*')
+      .eq('map_id', mapId);
+    const connectionRows = existingConnections ?? [];
+
+    await supabase.from('connections').delete().eq('map_id', mapId);
     await supabase.from('nodes').delete().eq('map_id', mapId);
     if (nodes.length > 0) {
       const rows = nodes.map((n) => ({ ...mapNodeToDbNode(n, mapId), id: ensureUuid(n.id) }));
@@ -63,6 +73,13 @@ export async function PUT(request: NextRequest, context: RouteContext) {
       if (insertError) {
         console.error('PUT /api/maps/[slug]/nodes insert', insertError);
         return NextResponse.json({ error: insertError.message }, { status: 500 });
+      }
+    }
+    if (connectionRows.length > 0) {
+      const { error: connError } = await supabase.from('connections').insert(connectionRows);
+      if (connError) {
+        console.error('PUT /api/maps/[slug]/nodes re-insert connections', connError);
+        return NextResponse.json({ error: connError.message }, { status: 500 });
       }
     }
     return NextResponse.json({ ok: true, count: nodes.length });

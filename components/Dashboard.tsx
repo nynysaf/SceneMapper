@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { User, SceneMap, MapTheme } from '../types';
 import { NodeType } from '../types';
-import { getMaps, saveMaps, deleteMap, copyNodesToSlug, saveNodes, saveConnections, getConnections, getFeatureRequests, getFeaturedMaps, updateMapFeature, isAbortError, getMapBackgroundUploadUrl, USE_BACKEND } from '../lib/data';
+import { getMaps, saveMaps, deleteMap, copyNodesToSlug, getNodes, saveNodes, getConnections, saveConnections, getFeatureRequests, getFeaturedMaps, updateMapFeature, isAbortError, getMapBackgroundUploadUrl, USE_BACKEND } from '../lib/data';
 import {
   DEFAULT_ADMIN_SUBJECT,
   DEFAULT_ADMIN_BODY,
