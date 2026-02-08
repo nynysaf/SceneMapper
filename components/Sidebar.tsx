@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { NodeType, MapNode, MapTheme } from '../types';
+import { NodeType, MapNode, MapTheme, MapConnection } from '../types';
 import { getElementLabel, getElementIcon } from '../lib/element-config';
 import { getIconComponent } from '../lib/icons';
 import { normalizeWebsiteUrl } from '../lib/url';
@@ -30,6 +30,11 @@ interface SidebarProps {
   /** Single node when exactly one selected; for multi-select, pass full array and we show count. */
   selectedNodes: MapNode[];
   onClearSelection: () => void;
+  /** When user clicks a connection line; show description in sidebar. */
+  selectedConnection?: MapConnection | null;
+  onClearConnectionSelection?: () => void;
+  /** Used to resolve connection from/to node titles when showing selected connection. */
+  nodes?: MapNode[];
   userRole: string;
   mapTheme?: MapTheme;
   mapDescription?: string;
@@ -79,6 +84,9 @@ function Sidebar({
   onConnectionsFilterToggle,
   selectedNodes,
   onClearSelection,
+  selectedConnection = null,
+  onClearConnectionSelection,
+  nodes = [],
   userRole,
   mapTheme,
   mapDescription,
@@ -110,6 +118,10 @@ function Sidebar({
   React.useEffect(() => {
     onCollapsedChange?.(isCollapsed);
   }, [isCollapsed, onCollapsedChange]);
+
+  React.useEffect(() => {
+    if (selectedConnection) setIsCollapsed(false);
+  }, [selectedConnection]);
 
   // Expand sidebar when a node (e.g. region) is selected so options are visible
   // REMOVED: User wants the sidebar to stay minimized if they minimized it
@@ -181,7 +193,41 @@ function Sidebar({
             <div className="w-1.5 h-12 rounded-full bg-emerald-500" />
           </button>
           <div className="h-full flex flex-col p-6 overflow-y-auto pt-12 md:pt-6 glass shadow-2xl flex-1 w-[90vw] max-w-sm md:w-80">
-        {selectedNodes.length > 0 ? (
+        {selectedConnection ? (
+          <div className="flex flex-col gap-4 relative">
+            <div className="flex justify-between items-start gap-2">
+              <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest text-white bg-emerald-600">
+                {connectionLabel}
+              </span>
+              {onClearConnectionSelection && (
+                <button
+                  onClick={onClearConnectionSelection}
+                  className="text-emerald-800 hover:bg-emerald-100 p-1 rounded-full transition-colors"
+                  title="Close"
+                >
+                  <X size={20} />
+                </button>
+              )}
+            </div>
+            {nodes.length > 0 && (() => {
+              const fromNode = nodes.find((n) => n.id === selectedConnection.fromNodeId);
+              const toNode = nodes.find((n) => n.id === selectedConnection.toNodeId);
+              return (
+                <p className="text-sm text-emerald-800 font-medium">
+                  {fromNode?.title ?? 'Unknown'} → {toNode?.title ?? 'Unknown'}
+                </p>
+              );
+            })()}
+            <p className="text-emerald-800 leading-relaxed font-light whitespace-pre-line">
+              {selectedConnection.description || 'No description.'}
+            </p>
+            {selectedConnection.status === 'pending' && (
+              <span className="px-2 py-1 rounded-full text-[9px] font-semibold uppercase tracking-widest bg-amber-50 text-amber-800 border border-amber-200">
+                Pending approval
+              </span>
+            )}
+          </div>
+        ) : selectedNodes.length > 0 ? (
           <div className="flex flex-col gap-4 relative">
             {userRole === 'admin' && onEditMapSettings && !isNodePopupOpen && (
               <button

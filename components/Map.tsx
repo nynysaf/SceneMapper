@@ -79,6 +79,10 @@ interface MapProps {
    */
   onConnectionCreate?: (fromNodeId: string, toNodeId: string) => void;
   /**
+   * Called when user clicks a connection line. Opens sidebar to show description etc.
+   */
+  onConnectionSelect?: (connection: MapConnection) => void;
+  /**
    * When true, the map is being captured for export: zoom is disabled and transform is identity.
    */
   exportMode?: boolean;
@@ -119,6 +123,7 @@ const Map: React.FC<MapProps> = ({
   currentUserName,
   onConnectionCurveChange,
   onConnectionCreate,
+  onConnectionSelect,
   exportMode = false,
   mapBackgroundColor = '#fdfcf0',
 }) => {
@@ -127,6 +132,7 @@ const Map: React.FC<MapProps> = ({
   const dragStartRef = useRef({ x: 0, y: 0 });
   const bulkDragStartRef = useRef<Record<string, { x: number; y: number }>>({});
   const connectionDragCleanupRef = useRef<(() => void) | null>(null);
+  const connectionJustDraggedRef = useRef(false);
   const DRAG_THRESHOLD_SQ = 25; // 5px movement = real drag (below = treat as click)
   const selectedSet = useMemo(() => new Set(selectedNodeIds), [selectedNodeIds]);
 
@@ -201,7 +207,7 @@ const Map: React.FC<MapProps> = ({
       return false;
     });
     if (connectionsToDraw.length > 0) {
-      const connectionLayer = container.append('g').attr('class', 'connection-layer').style('pointer-events', 'none');
+      const connectionLayer = container.append('g').attr('class', 'connection-layer').style('pointer-events', 'auto');
       const canEditCurve = isEditable && !isPlacing && !!onConnectionCurveChange;
       connectionsToDraw.forEach((conn) => {
         const fromNode = nodeById[conn.fromNodeId];
@@ -217,13 +223,12 @@ const Map: React.FC<MapProps> = ({
           cpx = conn.curveOffsetX * SCALE;
           cpy = conn.curveOffsetY * SCALE;
         } else {
-          // Default: offset control point perpendicular to the segment so the line curves
           const dx = toNode.x - fromNode.x;
           const dy = toNode.y - fromNode.y;
           const len = Math.hypot(dx, dy) || 1;
           const midX = (fromNode.x + toNode.x) / 2;
           const midY = (fromNode.y + toNode.y) / 2;
-          const bulge = 0.15 * len; // curve strength (15% of segment length)
+          const bulge = 0.15 * len;
           const perpX = (-dy / len) * bulge;
           const perpY = (dx / len) * bulge;
           cpx = (midX + perpX) * SCALE;
@@ -248,17 +253,25 @@ const Map: React.FC<MapProps> = ({
           .attr('stroke', lineStyle.color)
           .attr('stroke-opacity', strokeOpacity)
           .attr('stroke-width', lineStyle.thickness)
-          .attr('stroke-linecap', 'round');
+          .attr('stroke-linecap', 'round')
+          .style('pointer-events', 'none');
+        const hitPath = group
+          .append('path')
+          .attr('d', pathD())
+          .attr('fill', 'none')
+          .attr('stroke', 'transparent')
+          .attr('stroke-width', 20)
+          .attr('stroke-linecap', 'round')
+          .style('pointer-events', 'stroke')
+          .style('cursor', canEditCurve && conn.status === 'approved' ? 'grab' : 'pointer');
+        if (onConnectionSelect) {
+          hitPath.on('click', function (event: MouseEvent) {
+            event.stopPropagation();
+            if (connectionJustDraggedRef.current) return;
+            onConnectionSelect(conn);
+          });
+        }
         if (canEditCurve && conn.status === 'approved') {
-          const hitPath = group
-            .append('path')
-            .attr('d', pathD())
-            .attr('fill', 'none')
-            .attr('stroke', 'transparent')
-            .attr('stroke-width', 20)
-            .attr('stroke-linecap', 'round')
-            .style('cursor', 'grab')
-            .style('pointer-events', 'stroke');
           const updatePaths = () => {
             const d = pathD();
             group.selectAll('path').attr('d', d);
@@ -270,6 +283,7 @@ const Map: React.FC<MapProps> = ({
             })
             .on('start', function (event) {
               event.sourceEvent.stopPropagation();
+              connectionJustDraggedRef.current = false;
               d3.select(this).style('cursor', 'grabbing');
             })
             .on('drag', function (event) {
@@ -279,6 +293,10 @@ const Map: React.FC<MapProps> = ({
             })
             .on('end', function () {
               d3.select(this).style('cursor', 'grab');
+              connectionJustDraggedRef.current = true;
+              setTimeout(() => {
+                connectionJustDraggedRef.current = false;
+              }, 100);
               const curveX = Math.max(0, Math.min(100, cpxCur / SCALE));
               const curveY = Math.max(0, Math.min(100, cpyCur / SCALE));
               onConnectionCurveChange!(conn.id, curveX, curveY);
@@ -542,6 +560,7 @@ const Map: React.FC<MapProps> = ({
     // Handle map click: placement (when placing) or clear multi-selection (when not placing)
     svg.on('click', function(event: MouseEvent) {
       if ((event.target as any).closest?.('.node-group')) return;
+      if ((event.target as any).closest?.('.connection-group')) return;
 
       if (isPlacing && onMapClick) {
         const pt = svgRef.current!.createSVGPoint();
@@ -562,7 +581,7 @@ const Map: React.FC<MapProps> = ({
     return () => {
       connectionDragCleanupRef.current?.();
     };
-  }, [nodes, connections, currentUserName, lineStyle, onNodeMove, onNodeSelect, onMapClick, isEditable, isPlacing, nodeSizeScale, nodeLabelFontScale, regionFontScale, regionFontFamily, categoryColors, onConnectionCurveChange, onConnectionCreate, exportMode, selectedNodeIds, onNodesMove, onMapBackgroundClick]);
+  }, [nodes, connections, currentUserName, lineStyle, onNodeMove, onNodeSelect, onMapClick, isEditable, isPlacing, nodeSizeScale, nodeLabelFontScale, regionFontScale, regionFontFamily, categoryColors, onConnectionCurveChange, onConnectionCreate, onConnectionSelect, exportMode, selectedNodeIds, onNodesMove, onMapBackgroundClick]);
 
   return (
     <svg 

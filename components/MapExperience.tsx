@@ -102,6 +102,7 @@ const MapExperience: React.FC<MapExperienceProps> = ({
   const [isAdminReviewOpen, setIsAdminReviewOpen] = useState(false);
   const [pendingNode, setPendingNode] = useState<Partial<MapNode> | null>(null);
   const [selectedNodes, setSelectedNodes] = useState<MapNode[]>([]);
+  const [selectedConnection, setSelectedConnection] = useState<MapConnection | null>(null);
   const [popupAnchor, setPopupAnchor] = useState<{ x: number; y: number } | null>(null);
   const [hasCollaboratorPassword, setHasCollaboratorPassword] = useState(false);
   const [isJoinOpen, setIsJoinOpen] = useState(false);
@@ -328,11 +329,19 @@ const MapExperience: React.FC<MapExperienceProps> = ({
 
   const handleMapBackgroundClick = useCallback(() => {
     setSelectedNodes([]);
+    setSelectedConnection(null);
+    setPopupAnchor(null);
+  }, []);
+
+  const handleConnectionSelect = useCallback((connection: MapConnection) => {
+    setSelectedConnection(connection);
+    setSelectedNodes([]);
     setPopupAnchor(null);
   }, []);
 
   // Handles clicking a node: single select (popup) or Shift+Click for multi-select
   const handleNodeSelect = (node: MapNode, screenPos: { x: number; y: number }, opts?: { shiftKey?: boolean }) => {
+    setSelectedConnection(null);
     if (opts?.shiftKey && userSession.role !== 'public') {
       // Multi-select: add/remove from selection
       setSelectedNodes((prev) => {
@@ -1005,6 +1014,7 @@ const MapExperience: React.FC<MapExperienceProps> = ({
                   handleSubmitConnection({ fromNodeId: fromId, toNodeId: toId, description: '' })
               : undefined
           }
+          onConnectionSelect={handleConnectionSelect}
           connectionLineStyle={mapTheme?.connectionLine ?? (mapTheme ? { color: mapTheme.primaryColor, opacity: 0.6, thickness: 2 } : undefined)}
           mapBackgroundColor={mapTheme?.backgroundColor}
         />
@@ -1079,8 +1089,12 @@ const MapExperience: React.FC<MapExperienceProps> = ({
         selectedNodes={selectedNodes}
         onClearSelection={() => {
           setSelectedNodes([]);
+          setSelectedConnection(null);
           setPopupAnchor(null);
         }}
+        selectedConnection={selectedConnection}
+        onClearConnectionSelection={() => setSelectedConnection(null)}
+        nodes={nodes}
         userRole={userSession.role}
         mapTheme={mapTheme}
         mapDescription={mapDescription}
