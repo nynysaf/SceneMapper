@@ -570,11 +570,16 @@ const Dashboard: React.FC<DashboardProps> = ({
           backgroundImageUrl = await readFileAsDataUrl(backgroundFile);
         }
       } catch (err) {
-        setBackgroundError(err instanceof Error ? err.message : 'Could not upload background image. Please try again.');
+        const msg = err instanceof Error ? err.message : '';
+        const isNetworkError = /network|fetch|failed/i.test(msg) || (err instanceof TypeError && err.message?.includes('fetch'));
+        setBackgroundError(
+          isNetworkError
+            ? 'Upload failed (network). Check R2 CORS allows your app origin—see docs/R2_SETUP.md.'
+            : msg || 'Could not upload background image. Please try again.'
+        );
         setIsBuildingMap(false);
         return;
       }
-    }
 
     const selectedPreset =
       THEME_PRESETS.find((preset) => preset.id === selectedThemeId) ?? DEFAULT_THEME;
@@ -1379,7 +1384,13 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 
                                 setUploadResult(result);
                               } catch (err) {
-                                setUploadError(err instanceof Error ? err.message : 'Upload failed');
+                                const msg = err instanceof Error ? err.message : 'Upload failed';
+                                const isPayloadOrNetwork = /413|payload|network|fetch/i.test(msg);
+                                setUploadError(
+                                  isPayloadOrNetwork
+                                    ? 'Import failed (request too large or network). Try fewer rows or split your file.'
+                                    : msg
+                                );
                               } finally {
                                 setIsUploading(false);
                               }

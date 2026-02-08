@@ -36,6 +36,9 @@ function createClient() {
     endpoint,
     credentials: { accessKeyId, secretAccessKey },
     forcePathStyle: true,
+    // Disable automatic CRC32 so presigned PUT works from the browser (browser can't send checksum headers).
+    requestChecksumCalculation: 'WHEN_REQUIRED',
+    responseChecksumValidation: 'WHEN_REQUIRED',
   });
 }
 

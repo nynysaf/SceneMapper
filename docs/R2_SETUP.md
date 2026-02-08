@@ -130,3 +130,42 @@ R2_PUBLIC_URL=https://pub-xxxx.r2.dev
 - [ ] **R2 API token** created and **R2_ACCOUNT_ID**, **R2_ACCESS_KEY_ID**, **R2_SECRET_ACCESS_KEY**, **R2_BUCKET_NAME** set in `.env.local`
 
 After that, background image upload in the app should work.
+
+---
+
+## 5. Troubleshooting: "NetworkError when attempting to fetch resource"
+
+This usually means the **browser blocked the upload** to R2 because of **CORS**. The upload is a cross-origin `PUT` from your app to R2; the bucket must allow your app’s origin.
+
+**Do this:**
+
+1. **Confirm which origin you’re using**  
+   Open your app in the browser and check the address bar. The origin is exactly that URL with no path and no trailing slash, e.g.:
+   - `http://localhost:3000`
+   - `https://your-app.vercel.app`
+   - `https://scenemapper.ca`
+
+2. **Fix CORS on the R2 bucket**  
+   R2 → **map-backgrounds** → **Settings** → **CORS Policy** → **Add CORS policy** (or Edit). In the **JSON** tab use (replace with your real origins):
+
+   ```json
+   [
+     {
+       "AllowedOrigins": ["http://localhost:3000", "https://your-app.vercel.app", "https://scenemapper.ca"],
+       "AllowedMethods": ["GET", "PUT", "HEAD"],
+       "AllowedHeaders": ["Content-Type"],
+       "ExposeHeaders": ["ETag"],
+       "MaxAgeSeconds": 3600
+     }
+   ]
+   ```
+
+   - **AllowedOrigins:** Include **every** URL you use to open the app (localhost, Vercel URL, custom domain). No trailing slash. Exact match only.
+   - **AllowedMethods:** Must include **PUT**.
+   - **AllowedHeaders:** Must include **Content-Type**.
+
+3. **Save and wait**  
+   CORS can take up to ~30 seconds to apply. Try the upload again.
+
+4. **Check the browser Network tab**  
+   Open DevTools (F12) → **Network**. Try the upload again. Find the request that failed (it may be to an `r2.cloudflarestorage.com` or `r2.dev` URL). If you see a **CORS error** in the console or the failed request has no response body, CORS is still wrong or not applied yet.

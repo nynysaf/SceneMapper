@@ -80,6 +80,8 @@ async function getMapPageDataApi(slug: string, options?: DataLayerOptions): Prom
 
 /** Vercel serverless request body limit is 4.5 MB. Keep under 4 MB to be safe. Background images are uploaded to Supabase Storage when using backend, so they are not part of this payload. */
 const SAVE_MAPS_BODY_LIMIT = 4 * 1024 * 1024;
+/** Same limit for nodes/connections PUT (e.g. xlsx import). */
+const SAVE_BODY_LIMIT = 4 * 1024 * 1024;
 
 async function saveMapsApi(maps: SceneMap[]): Promise<void> {
   const body = JSON.stringify(maps);
@@ -185,8 +187,31 @@ async function getNodesApi(mapSlug: string, options?: DataLayerOptions): Promise
 }
 
 async function saveNodesApi(mapSlug: string, nodes: MapNode[]): Promise<void> {
-  const r = await fetch(`${apiBase()}/api/maps/${encodeURIComponent(mapSlug)}/nodes`, fetchOpts('PUT', nodes, true));
-  if (!r.ok) throw new Error(`saveNodes: ${r.status}`);
+  const body = JSON.stringify(nodes);
+  if (body.length <= SAVE_BODY_LIMIT) {
+    const r = await fetch(`${apiBase()}/api/maps/${encodeURIComponent(mapSlug)}/nodes`, fetchOpts('PUT', nodes, true));
+    if (!r.ok) {
+      const resBody = await r.json().catch(() => ({}));
+      const msg = typeof (resBody as { error?: string }).error === 'string' ? (resBody as { error: string }).error : `saveNodes: ${r.status}`;
+      throw new Error(msg);
+    }
+    return;
+  }
+  const chunkSize = Math.max(1, Math.floor(nodes.length / Math.ceil(body.length / SAVE_BODY_LIMIT)));
+  for (let i = 0; i < nodes.length; i += chunkSize) {
+    const chunk = nodes.slice(i, i + chunkSize);
+    let current = chunk;
+    if (i > 0) {
+      const existing = await getNodesApi(mapSlug);
+      current = [...existing, ...chunk];
+    }
+    const r = await fetch(`${apiBase()}/api/maps/${encodeURIComponent(mapSlug)}/nodes`, fetchOpts('PUT', current, true));
+    if (!r.ok) {
+      const resBody = await r.json().catch(() => ({}));
+      const msg = typeof (resBody as { error?: string }).error === 'string' ? (resBody as { error: string }).error : `saveNodes: ${r.status}`;
+      throw new Error(msg);
+    }
+  }
 }
 
 // --- Connections (backend) ---
@@ -201,8 +226,31 @@ async function getConnectionsApi(mapSlug: string, options?: DataLayerOptions): P
 }
 
 async function saveConnectionsApi(mapSlug: string, connections: MapConnection[]): Promise<void> {
-  const r = await fetch(`${apiBase()}/api/maps/${encodeURIComponent(mapSlug)}/connections`, fetchOpts('PUT', connections, true));
-  if (!r.ok) throw new Error(`saveConnections: ${r.status}`);
+  const body = JSON.stringify(connections);
+  if (body.length <= SAVE_BODY_LIMIT) {
+    const r = await fetch(`${apiBase()}/api/maps/${encodeURIComponent(mapSlug)}/connections`, fetchOpts('PUT', connections, true));
+    if (!r.ok) {
+      const resBody = await r.json().catch(() => ({}));
+      const msg = typeof (resBody as { error?: string }).error === 'string' ? (resBody as { error: string }).error : `saveConnections: ${r.status}`;
+      throw new Error(msg);
+    }
+    return;
+  }
+  const chunkSize = Math.max(1, Math.floor(connections.length / Math.ceil(body.length / SAVE_BODY_LIMIT)));
+  for (let i = 0; i < connections.length; i += chunkSize) {
+    const chunk = connections.slice(i, i + chunkSize);
+    let current = chunk;
+    if (i > 0) {
+      const existing = await getConnectionsApi(mapSlug);
+      current = [...existing, ...chunk];
+    }
+    const r = await fetch(`${apiBase()}/api/maps/${encodeURIComponent(mapSlug)}/connections`, fetchOpts('PUT', current, true));
+    if (!r.ok) {
+      const resBody = await r.json().catch(() => ({}));
+      const msg = typeof (resBody as { error?: string }).error === 'string' ? (resBody as { error: string }).error : `saveConnections: ${r.status}`;
+      throw new Error(msg);
+    }
+  }
 }
 
 // --- Users & session (backend) ---
