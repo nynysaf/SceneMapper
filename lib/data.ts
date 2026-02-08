@@ -127,6 +127,37 @@ async function saveMapsApi(maps: SceneMap[]): Promise<void> {
   }
 }
 
+async function deleteMapApi(mapSlug: string): Promise<void> {
+  const r = await fetch(`${apiBase()}/api/maps/${encodeURIComponent(mapSlug)}`, {
+    method: 'DELETE',
+    credentials: 'include',
+    signal: undefined,
+  });
+  if (!r.ok) {
+    const body = await r.json().catch(() => ({}));
+    const msg =
+      typeof (body as { error?: string }).error === 'string'
+        ? (body as { error: string }).error
+        : `deleteMap: ${r.status}`;
+    throw new Error(msg);
+  }
+}
+
+/**
+ * Delete a map by slug. With backend: calls DELETE /api/maps/[slug].
+ * Without backend: removes from localStorage (via saveMaps with filtered list).
+ */
+export async function deleteMap(mapSlug: string): Promise<void> {
+  guard();
+  if (USE_BACKEND) {
+    await deleteMapApi(mapSlug);
+    return;
+  }
+  const maps = safeJson<SceneMap[]>(localStorage.getItem(KEY_MAPS), []);
+  const next = maps.filter((m) => m.slug !== mapSlug);
+  localStorage.setItem(KEY_MAPS, JSON.stringify(next));
+}
+
 /** Records that the current user has viewed this map (for Your Maps filtering). No-op when not using backend or not logged in. */
 export async function recordMapView(mapSlug: string, options?: DataLayerOptions): Promise<void> {
   guard();

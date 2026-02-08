@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { MapNode, MapTheme } from '../types';
 import { getElementLabel } from '../lib/element-config';
+import { normalizeWebsiteUrl } from '../lib/url';
 import { X, ExternalLink, ScrollText, Pencil, Trash2 } from 'lucide-react';
 
 interface NodePopupProps {
@@ -43,7 +44,7 @@ const NodePopup: React.FC<NodePopupProps> = ({
     ? { left: `${left}px`, bottom: `${window.innerHeight - anchor.y + gap}px`, width: `${popupWidth}px` }
     : { left: `${left}px`, top: `${anchor.y + gap}px`, width: `${popupWidth}px` };
 
-  const websiteUrl = node.website || '';
+  const websiteUrl = node.website ? normalizeWebsiteUrl(node.website) : '';
   const categoryColors = mapTheme?.categoryColors;
 
   return (

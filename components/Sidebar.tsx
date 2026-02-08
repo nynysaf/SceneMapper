@@ -3,6 +3,7 @@ import React from 'react';
 import { NodeType, MapNode, MapTheme } from '../types';
 import { getElementLabel, getElementIcon } from '../lib/element-config';
 import { getIconComponent } from '../lib/icons';
+import { normalizeWebsiteUrl } from '../lib/url';
 import { X, ExternalLink, User, Leaf, Pencil, Trash2, Settings2, Link2, QrCode, Download, Plus, FileDown, Check } from 'lucide-react';
 
 /** Squiggly/curved line icon for connection filter (20px, matches other filter icons). */
@@ -262,14 +263,17 @@ function Sidebar({
                         {selectedNode.description}
                       </p>
 
-                      {selectedNode.website && (
+                      {selectedNode.website && (() => {
+                        const url = normalizeWebsiteUrl(selectedNode.website);
+                        return (
                         <div className="flex items-center gap-2 text-emerald-600 text-sm font-semibold">
                           <ExternalLink size={16} />
-                          <a href={selectedNode.website} target="_blank" rel="noopener noreferrer" className="hover:underline break-all">
-                            {selectedNode.website.replace(/^https?:\/\//, '')}
+                          <a href={url} target="_blank" rel="noopener noreferrer" className="hover:underline break-all">
+                            {url.replace(/^https?:\/\//, '')}
                           </a>
                         </div>
-                      )}
+                        );
+                      })()}
 
                       {false && selectedNode.tags.length > 0 && (
                       <div className="flex flex-wrap gap-2 mt-4">
@@ -288,7 +292,7 @@ function Sidebar({
                         </div>
                         {selectedNode.website && (
                           <a 
-                            href={selectedNode.website}
+                            href={normalizeWebsiteUrl(selectedNode.website)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="w-full bg-emerald-100 text-emerald-800 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-emerald-200 transition-colors"

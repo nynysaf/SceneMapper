@@ -158,6 +158,10 @@ export interface SceneMap {
    */
   elementConfig?: Partial<Record<NodeType, { label: string; icon: string; enabled: boolean }>>;
   /**
+   * Order of element types in the dashboard and filters. When absent, use default order.
+   */
+  elementOrder?: NodeType[];
+  /**
    * Connection display config: label, icon. Color/opacity/thickness stay in theme.connectionLine.
    */
   connectionConfig?: { label?: string; icon?: string };

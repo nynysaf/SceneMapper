@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { User, SceneMap, MapTheme } from '../types';
 import { NodeType } from '../types';
-import { getMaps, saveMaps, copyNodesToSlug, saveNodes, saveConnections, getConnections, isAbortError } from '../lib/data';
+import { getMaps, saveMaps, deleteMap, copyNodesToSlug, saveNodes, saveConnections, getConnections, isAbortError } from '../lib/data';
 import {
   DEFAULT_ADMIN_SUBJECT,
   DEFAULT_ADMIN_BODY,
@@ -22,7 +22,7 @@ import {
 } from '../lib/element-config';
 import { getIconComponent } from '../lib/icons';
 import ElementIconPicker from './ElementIconPicker';
-import { Trash2, Link2, QrCode, Pencil, X, Plus, Upload, Download, Image, ChevronDown, ChevronRight, GripVertical } from 'lucide-react';
+import { Trash2, Link2, QrCode, Pencil, X, Plus, Upload, Download, Image, ChevronDown, ChevronRight, GripVertical, Loader2 } from 'lucide-react';
 
 interface DashboardProps {
   onNavigate: (path: string) => void;
@@ -193,6 +193,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [backgroundError, setBackgroundError] = useState<string | null>(null);
   const [editingMapId, setEditingMapId] = useState<string | null>(null);
   const [editingOriginalSlug, setEditingOriginalSlug] = useState<string | null>(null);
+  const [isBuildingMap, setIsBuildingMap] = useState(false);
   const [customEventColor, setCustomEventColor] = useState<string>(
     DEFAULT_THEME.theme.categoryColors?.[NodeType.EVENT] || '#E67E22',
   );
@@ -268,10 +269,22 @@ const Dashboard: React.FC<DashboardProps> = ({
     });
   };
 
-  const handleConfirmDeleteMap = () => {
+  const handleConfirmDeleteMap = async () => {
     if (!mapToDelete) return;
     const next = maps.filter((m) => m.id !== mapToDelete.id);
-    persistMaps(next);
+    const useBackend = typeof process !== 'undefined' && process.env.NEXT_PUBLIC_USE_BACKEND === 'true';
+    if (useBackend) {
+      try {
+        await deleteMap(mapToDelete.slug);
+      } catch (err) {
+        setMapError(err instanceof Error ? err.message : 'Could not delete map. Please try again.');
+        setMapToDelete(null);
+        return;
+      }
+    } else {
+      persistMaps(next);
+    }
+    setMaps(next);
     if (editingMapId === mapToDelete.id) {
       setEditingMapId(null);
       setEditingOriginalSlug(null);
@@ -387,6 +400,9 @@ const Dashboard: React.FC<DashboardProps> = ({
       const enabled = match.enabledNodeTypes ?? DEFAULT_ENABLED_NODE_TYPES;
       setElementConfig(buildElementConfig(tpl, undefined, enabled));
     }
+    setElementOrder(
+      match.elementOrder && match.elementOrder.length > 0 ? [...match.elementOrder] : [...REORDERABLE_NODE_TYPES],
+    );
     setConnectionConfig(match.connectionConfig ?? undefined);
     setThemeSectionOpen(false);
     setRolesSectionOpen(false);
@@ -479,9 +495,11 @@ const Dashboard: React.FC<DashboardProps> = ({
     e.preventDefault();
     setMapError(null);
     setBackgroundError(null);
+    setIsBuildingMap(true);
 
     if (!currentUser) {
       setMapError('You need an account to create and save maps.');
+      setIsBuildingMap(false);
       return;
     }
 
@@ -491,6 +509,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     const exists = maps.some((m) => m.slug === slug);
     if (exists && (!editingMapId || maps.find((m) => m.slug === slug)?.id !== editingMapId)) {
       setMapError('A map with this URL already exists. Try a different slug.');
+      setIsBuildingMap(false);
       return;
     }
 
@@ -501,10 +520,12 @@ const Dashboard: React.FC<DashboardProps> = ({
 
       if (!allowedTypes.includes(backgroundFile.type)) {
         setBackgroundError('Use PNG, JPG, or WebP for the background image.');
+        setIsBuildingMap(false);
         return;
       }
       if (backgroundFile.size > maxBytes) {
         setBackgroundError('Background image is too large. Maximum size is 5MB.');
+        setIsBuildingMap(false);
         return;
       }
 
@@ -512,6 +533,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         backgroundImageUrl = await readFileAsDataUrl(backgroundFile);
       } catch {
         setBackgroundError('Could not read background image. Please try again.');
+        setIsBuildingMap(false);
         return;
       }
     }
@@ -559,12 +581,13 @@ const Dashboard: React.FC<DashboardProps> = ({
       invitationEmailSubjectCollaborator: invitationEmailSubjectCollaborator.trim() || undefined,
       invitationEmailBodyCollaborator: invitationEmailBodyCollaborator.trim() || undefined,
       invitationSenderName: invitationSenderName.trim() || undefined,
-      enabledNodeTypes: enabledNodeTypes.length < 4 ? enabledNodeTypes : undefined,
+      enabledNodeTypes: enabledNodeTypes.length > 0 ? enabledNodeTypes : undefined,
       connectionsEnabled: connectionsEnabled ? undefined : false,
       icon: mapIcon || undefined,
       iconBackground: mapIconBackground || undefined,
       mapTemplateId: mapTemplateId ?? DEFAULT_MAP_TEMPLATE_ID,
       elementConfig: elementConfig ?? undefined,
+      elementOrder: elementOrder.length > 0 ? elementOrder : undefined,
       connectionConfig: connectionConfig ?? undefined,
     };
 
@@ -599,6 +622,19 @@ const Dashboard: React.FC<DashboardProps> = ({
         themeId: baseFields.themeId,
         invitedAdminEmails: baseFields.invitedAdminEmails,
         invitedCollaboratorEmails: baseFields.invitedCollaboratorEmails,
+        invitationEmailSubjectAdmin: baseFields.invitationEmailSubjectAdmin,
+        invitationEmailBodyAdmin: baseFields.invitationEmailBodyAdmin,
+        invitationEmailSubjectCollaborator: baseFields.invitationEmailSubjectCollaborator,
+        invitationEmailBodyCollaborator: baseFields.invitationEmailBodyCollaborator,
+        invitationSenderName: baseFields.invitationSenderName,
+        enabledNodeTypes: baseFields.enabledNodeTypes,
+        connectionsEnabled: baseFields.connectionsEnabled,
+        icon: baseFields.icon,
+        iconBackground: baseFields.iconBackground,
+        mapTemplateId: baseFields.mapTemplateId,
+        elementConfig: baseFields.elementConfig,
+        elementOrder: baseFields.elementOrder,
+        connectionConfig: baseFields.connectionConfig,
       };
       nextMaps = [...maps, newMap];
       targetMapId = newMap.id;
@@ -611,6 +647,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         await persistMaps(nextMaps);
       } catch (err) {
         setMapError(err instanceof Error ? err.message : 'Could not save map. Please try again.');
+        setIsBuildingMap(false);
         return;
       }
     } else {
@@ -662,7 +699,16 @@ const Dashboard: React.FC<DashboardProps> = ({
     onNavigate(`/maps/${slug}`);
   };
   return (
-    <div className="w-screen h-screen bg-[#fdfcf0] flex flex-col">
+    <>
+      {isBuildingMap && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#fdfcf0]/95 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="w-12 h-12 text-emerald-600 animate-spin" aria-hidden />
+            <p className="text-lg font-semibold text-emerald-900">Building map</p>
+          </div>
+        </div>
+      )}
+      <div className="w-screen h-screen bg-[#fdfcf0] flex flex-col">
       <header className="flex items-center justify-between px-6 py-4 border-b border-emerald-100 bg-white/70 backdrop-blur">
         <div className="flex items-center gap-3">
           <button
@@ -1185,7 +1231,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                     collaboratorIds: [],
                                     publicView: true,
                                     themeId: selectedThemeId === baseThemeId ? selectedPreset.id : 'custom',
-                                    enabledNodeTypes: enabledNodeTypes.length < 4 ? enabledNodeTypes : undefined,
+                                    enabledNodeTypes: enabledNodeTypes.length > 0 ? enabledNodeTypes : undefined,
                                     connectionsEnabled: connectionsEnabled ? undefined : false,
                                     icon: mapIcon || undefined,
                                     iconBackground: mapIconBackground || undefined,
@@ -2060,6 +2106,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         </div>
       )}
     </div>
+    </>
   );
 };
 

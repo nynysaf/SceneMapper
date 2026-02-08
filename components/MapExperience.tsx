@@ -4,12 +4,13 @@ import { MapNode, MapConnection, NodeType, UserSession, MapTheme, SceneMap, User
 import { INITIAL_NODES, CATEGORY_COLORS, DEFAULT_ENABLED_NODE_TYPES } from '../constants';
 import { getElementLabel } from '../lib/element-config';
 import { getNodes as loadNodes, saveNodes as persistNodes, getConnections as loadConnections, saveConnections as persistConnections, getSession, getMaps, saveMaps, isAbortError } from '../lib/data';
+import { normalizeWebsiteUrl } from '../lib/url';
 import Map from './Map';
 import Sidebar from './Sidebar';
 import SubmissionModal from './SubmissionModal';
 import NodePopup from './NodePopup';
 import AdminReviewModal from './AdminReviewModal';
-import { Plus, Info, Users, ShieldCheck, MapPin, Inbox, X } from 'lucide-react';
+import { Plus, Info, Users, ShieldCheck, MapPin, Inbox, X, Loader2 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { toCsv, toXlsx, exportFilename } from '../lib/export-data';
@@ -124,6 +125,7 @@ const MapExperience: React.FC<MapExperienceProps> = ({
   const mapCaptureRef = useRef<HTMLDivElement | null>(null);
   const nodesRef = useRef<MapNode[]>([]);
   const connectionsRef = useRef<MapConnection[]>([]);
+  const slugWhenClearedRef = useRef<string | null>(null);
   const [backgroundImageSize, setBackgroundImageSize] = useState<{ width: number; height: number } | null>(null);
 
   // Resolve background image dimensions for export (use when present, else default 1000x1000)
@@ -157,14 +159,19 @@ const MapExperience: React.FC<MapExperienceProps> = ({
     }
   }, [map]);
 
-  // Clear nodes/connections when page is loading (e.g. slug change) to avoid stale data
+  // Clear nodes/connections only when entering loading for a different slug (avoid wiping on spurious loading)
   useEffect(() => {
-    if (isDataLoading) {
+    if (isDataLoading && effectiveSlug !== slugWhenClearedRef.current) {
+      slugWhenClearedRef.current = effectiveSlug;
       setNodes([]);
       setConnections([]);
-      return;
+      nodesRef.current = [];
+      connectionsRef.current = [];
     }
-  }, [isDataLoading]);
+    if (!isDataLoading) {
+      slugWhenClearedRef.current = null;
+    }
+  }, [isDataLoading, effectiveSlug]);
 
   // Load effect: when page provides data (initialNodes), use it; else fetch. Always hydrate role.
   useEffect(() => {
@@ -742,13 +749,14 @@ const MapExperience: React.FC<MapExperienceProps> = ({
   const handleSaveEdit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedNode) return;
+    const website = normalizeWebsiteUrl(editWebsite) || undefined;
     const updatedNodes = nodes.map((n) =>
       n.id === selectedNode.id
         ? {
             ...n,
             title: editTitle,
             description: editDescription,
-            website: editWebsite || undefined,
+            website,
             type: editType,
           }
         : n,
@@ -803,7 +811,7 @@ const MapExperience: React.FC<MapExperienceProps> = ({
                 href="/"
                 className="text-[10px] md:text-xs text-emerald-700 font-medium hover:text-emerald-900 hover:underline"
               >
-                {mapSubtitle}
+                SceneMapper
               </Link>
             </div>
         </div>
@@ -962,9 +970,10 @@ const MapExperience: React.FC<MapExperienceProps> = ({
       {/* --- Main Map Area --- */}
       <main className={`flex-1 relative bg-[#e0f2f1] ${pendingNode ? 'cursor-crosshair' : ''}`}>
         {isDataLoading && (
-          <div className="absolute inset-0 z-40 flex items-center justify-center bg-[#e0f2f1]/90 backdrop-blur-sm">
-            <div className="glass px-6 py-4 rounded-2xl solarpunk-shadow text-emerald-800 font-semibold">
-              Loading map…
+          <div className="absolute inset-0 z-40 flex items-center justify-center bg-[#e0f2f1]/95 backdrop-blur-sm">
+            <div className="flex flex-col items-center gap-4">
+              <Loader2 className="w-12 h-12 text-emerald-600 animate-spin" aria-hidden />
+              <p className="text-lg font-semibold text-emerald-900">Building map</p>
             </div>
           </div>
         )}
@@ -1216,11 +1225,11 @@ const MapExperience: React.FC<MapExperienceProps> = ({
               <div className="space-y-1">
                 <label className="text-[11px] font-semibold text-emerald-900">Link</label>
                 <input
-                  type="url"
+                  type="text"
                   className="w-full bg-white/80 border border-emerald-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-400"
                   value={editWebsite}
                   onChange={(e) => setEditWebsite(e.target.value)}
-                  placeholder="https://example.org"
+                  placeholder="example.org or https://..."
                 />
               </div>
               <button

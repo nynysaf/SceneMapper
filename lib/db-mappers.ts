@@ -128,7 +128,16 @@ export function dbMapToSceneMap(row: DbMap): SceneMap {
     icon: row.icon ?? undefined,
     iconBackground: row.icon_background ?? undefined,
     mapTemplateId: (row.map_template_id ?? undefined) as SceneMap['mapTemplateId'],
-    elementConfig: (row.element_config ?? undefined) as SceneMap['elementConfig'],
+    ...(() => {
+      const raw = row.element_config as Record<string, unknown> | null | undefined;
+      if (!raw || typeof raw !== 'object') {
+        return { elementConfig: undefined as SceneMap['elementConfig'], elementOrder: undefined as SceneMap['elementOrder'] };
+      }
+      const { _order, ...rest } = raw;
+      const elementOrder = Array.isArray(_order) ? (_order as SceneMap['elementOrder']) : undefined;
+      const elementConfig = Object.keys(rest).length ? (rest as SceneMap['elementConfig']) : undefined;
+      return { elementConfig, elementOrder };
+    })(),
     connectionConfig: (row.connection_config ?? undefined) as SceneMap['connectionConfig'],
   };
 }
@@ -195,7 +204,10 @@ export function sceneMapToDbMap(m: SceneMap): Omit<DbMap, 'created_at' | 'update
     icon: m.icon ?? null,
     icon_background: m.iconBackground ?? null,
     map_template_id: m.mapTemplateId ?? null,
-    element_config: m.elementConfig ?? null,
+    element_config:
+      m.elementConfig != null || m.elementOrder != null
+        ? { ...(m.elementConfig ?? {}), ...(m.elementOrder?.length ? { _order: m.elementOrder } : {}) }
+        : null,
     connection_config: m.connectionConfig ?? null,
   };
 }

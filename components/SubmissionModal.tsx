@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { NodeType, MapNode, MapConnection } from '../types';
 import { getElementLabel, MAP_TEMPLATES } from '../lib/element-config';
 import { getIconComponent } from '../lib/icons';
+import { normalizeWebsiteUrl } from '../lib/url';
 import { X, MapPin, AlertCircle, Link } from 'lucide-react';
 
 /** Submission is either a node (Event/Person/Space/Community) or a connection. null = not yet selected. */
@@ -82,7 +83,8 @@ const SubmissionModal: React.FC<SubmissionModalProps> = ({
     if (submissionKind == null) return;
     const title = formData.title?.trim();
     if (!title) return;
-    onSubmit({ ...formData, type: submissionKind, title });
+    const website = normalizeWebsiteUrl(formData.website || '') || undefined;
+    onSubmit({ ...formData, type: submissionKind, title, website });
   };
 
   const addTag = () => {
@@ -230,9 +232,9 @@ const SubmissionModal: React.FC<SubmissionModalProps> = ({
             <div className="relative">
               <Link size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-600" />
               <input
-                type="url"
+                type="text"
                 className="w-full bg-white/50 border-2 border-emerald-100 rounded-xl pl-12 pr-4 py-3 focus:outline-none focus:border-emerald-400 transition-colors text-emerald-900"
-                placeholder="https://community-garden.ca"
+                placeholder="example.com or https://..."
                 value={formData.website}
                 onChange={e => setFormData({ ...formData, website: e.target.value })}
               />
