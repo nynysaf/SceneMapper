@@ -6,7 +6,7 @@
 
 import type { SceneMap, MapNode, MapConnection, User, AuthSession } from '../types';
 
-const USE_BACKEND =
+export const USE_BACKEND =
   typeof process !== 'undefined' &&
   (process.env as Record<string, string | undefined>).NEXT_PUBLIC_USE_BACKEND === 'true';
 
@@ -78,7 +78,7 @@ async function getMapPageDataApi(slug: string, options?: DataLayerOptions): Prom
   return r.json();
 }
 
-/** Vercel serverless request body limit is 4.5 MB. Keep under 4 MB to be safe. */
+/** Vercel serverless request body limit is 4.5 MB. Keep under 4 MB to be safe. Background images are uploaded to Supabase Storage when using backend, so they are not part of this payload. */
 const SAVE_MAPS_BODY_LIMIT = 4 * 1024 * 1024;
 
 async function saveMapsApi(maps: SceneMap[]): Promise<void> {
@@ -355,6 +355,26 @@ export async function saveMaps(maps: SceneMap[]): Promise<void> {
     return;
   }
   localStorage.setItem(KEY_MAPS, JSON.stringify(maps));
+}
+
+/** Get presigned upload URL and public URL for a map background image (R2, backend only). Client PUTs file to uploadUrl. */
+export async function getMapBackgroundUploadUrl(
+  contentType: string,
+  mapId: string
+): Promise<{ uploadUrl: string; publicUrl: string }> {
+  guard();
+  const r = await fetch(`${apiBase()}/api/maps/upload-background`, {
+    ...fetchOpts('POST', { contentType, mapId }),
+    credentials: 'include',
+  });
+  if (!r.ok) {
+    const resBody = await r.json().catch(() => ({}));
+    const msg = typeof (resBody as { error?: string }).error === 'string' ? (resBody as { error: string }).error : `upload-background: ${r.status}`;
+    throw new Error(msg);
+  }
+  const data = (await r.json()) as { uploadUrl: string; publicUrl: string };
+  if (!data.uploadUrl || !data.publicUrl) throw new Error('Invalid upload URL response');
+  return data;
 }
 
 // --- Public API: Nodes ---

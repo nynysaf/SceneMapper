@@ -3,6 +3,7 @@ import type { SceneMap } from '@/types';
 import { supabase } from '@/lib/supabase-server';
 import { dbMapToSceneMap } from '@/lib/db-mappers';
 import { getCurrentUserFromRequest, getCurrentUserIdFromRequest, canAccessMap, isPlatformAdminEmail } from '@/lib/auth-api';
+import { deleteObjectByPublicUrl } from '@/lib/r2';
 
 type RouteContext = { params: Promise<{ slug: string }> };
 
@@ -53,7 +54,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
     }
     const { data: mapRow, error: fetchError } = await supabase
       .from('maps')
-      .select('id, admin_ids')
+      .select('id, admin_ids, background_image_url')
       .eq('slug', slug)
       .maybeSingle();
     if (fetchError) {
@@ -66,6 +67,8 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
     if (!isMapAdmin(mapRow, userId)) {
       return NextResponse.json({ error: 'Only map admins can delete this map' }, { status: 403 });
     }
+    const backgroundUrl = (mapRow as { background_image_url?: string | null }).background_image_url;
+    await deleteObjectByPublicUrl(backgroundUrl ?? undefined);
     const { error: deleteError } = await supabase.from('maps').delete().eq('id', mapRow.id);
     if (deleteError) {
       console.error('DELETE /api/maps/[slug]', deleteError);

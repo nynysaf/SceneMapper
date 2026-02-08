@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { User, SceneMap, MapTheme } from '../types';
 import { NodeType } from '../types';
-import { getMaps, saveMaps, deleteMap, copyNodesToSlug, saveNodes, saveConnections, getConnections, getFeatureRequests, getFeaturedMaps, updateMapFeature, isAbortError } from '../lib/data';
+import { getMaps, saveMaps, deleteMap, copyNodesToSlug, saveNodes, saveConnections, getConnections, getFeatureRequests, getFeaturedMaps, updateMapFeature, isAbortError, getMapBackgroundUploadUrl, USE_BACKEND } from '../lib/data';
 import {
   DEFAULT_ADMIN_SUBJECT,
   DEFAULT_ADMIN_BODY,
@@ -538,6 +538,8 @@ const Dashboard: React.FC<DashboardProps> = ({
       return;
     }
 
+    const mapIdForUpload = editingMapId ?? crypto.randomUUID();
+
     let backgroundImageUrl: string | undefined;
     if (backgroundFile) {
       const allowedTypes = ['image/png', 'image/jpeg', 'image/webp'];
@@ -555,9 +557,20 @@ const Dashboard: React.FC<DashboardProps> = ({
       }
 
       try {
-        backgroundImageUrl = await readFileAsDataUrl(backgroundFile);
-      } catch {
-        setBackgroundError('Could not read background image. Please try again.');
+        if (USE_BACKEND) {
+          const { uploadUrl, publicUrl } = await getMapBackgroundUploadUrl(backgroundFile.type, mapIdForUpload);
+          const putRes = await fetch(uploadUrl, {
+            method: 'PUT',
+            body: backgroundFile,
+            headers: { 'Content-Type': backgroundFile.type },
+          });
+          if (!putRes.ok) throw new Error('Upload failed');
+          backgroundImageUrl = publicUrl;
+        } else {
+          backgroundImageUrl = await readFileAsDataUrl(backgroundFile);
+        }
+      } catch (err) {
+        setBackgroundError(err instanceof Error ? err.message : 'Could not upload background image. Please try again.');
         setIsBuildingMap(false);
         return;
       }
@@ -638,7 +651,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       );
     } else {
       const newMap: SceneMap = {
-        id: crypto.randomUUID(),
+        id: mapIdForUpload,
         slug,
         title,
         description: baseFields.description || '',
