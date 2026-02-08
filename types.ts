@@ -165,6 +165,18 @@ export interface SceneMap {
    * Connection display config: label, icon. Color/opacity/thickness stay in theme.connectionLine.
    */
   connectionConfig?: { label?: string; icon?: string };
+  /**
+   * When set, the map creator has requested to be featured. Cleared when platform admin approves or denies.
+   */
+  featureRequestedAt?: string;
+  /**
+   * Position in the featured list (1-based). Null = not featured.
+   */
+  featuredOrder?: number;
+  /**
+   * When true, map is shown on the home page (up to 6). When false, only on the Featured maps page.
+   */
+  featuredActive?: boolean;
 }
 
 /**
@@ -214,4 +226,6 @@ export interface AuthSession {
   userId: string;
   email?: string;
   name?: string;
+  /** True when user is a platform admin (e.g. can manage feature requests). */
+  platformAdmin?: boolean;
 }

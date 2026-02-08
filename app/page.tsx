@@ -1,25 +1,29 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import LandingPage, { FEATURED_MAP_HREFS, slugFromHref } from '../components/LandingPage';
+import LandingPage from '../components/LandingPage';
 import type { User, SceneMap } from '../types';
-import { getSession, getMaps, isAbortError } from '../lib/data';
+import { getSession, getMaps, getFeaturedMaps, isAbortError } from '../lib/data';
 
 /**
  * Next.js App Router landing page for Scene Mapper.
  *
  * Fetches session and user; when logged in, fetches maps for the "Your Maps" panel.
+ * Featured maps come from getFeaturedMaps() (DB); up to 6 with featuredActive shown on home, "More" links to /featured-maps.
  */
 export default function HomePage() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [allMaps, setAllMaps] = useState<SceneMap[]>([]);
+  const [featuredMapsAll, setFeaturedMapsAll] = useState<SceneMap[]>([]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const ac = new AbortController();
-    Promise.all([getMaps({ signal: ac.signal }), getSession()])
-      .then(([maps, session]) => {
+    const opts = { signal: ac.signal };
+    Promise.all([getMaps(opts), getSession(), getFeaturedMaps(opts)])
+      .then(([maps, session, featured]) => {
         setAllMaps(maps);
+        setFeaturedMapsAll(featured);
         if (session) {
           setCurrentUser({
             id: session.userId,
@@ -33,15 +37,15 @@ export default function HomePage() {
         if (!isAbortError(err)) {
           setCurrentUser(null);
           setAllMaps([]);
+          setFeaturedMapsAll([]);
         }
       });
     return () => ac.abort();
   }, []);
 
   const userMaps = currentUser ? allMaps : [];
-  const featuredMaps = FEATURED_MAP_HREFS.map((href) =>
-    allMaps.find((m) => m.slug === slugFromHref(href)),
-  ).filter((m): m is SceneMap => m != null);
+  const featuredForHome = featuredMapsAll.filter((m) => m.featuredActive !== false).slice(0, 6);
+  const showMoreFeatured = featuredMapsAll.length > 6;
 
   const handleNavigate = (path: string) => {
     if (typeof window === 'undefined') return;
@@ -53,7 +57,8 @@ export default function HomePage() {
       onNavigate={handleNavigate}
       currentUser={currentUser}
       userMaps={userMaps}
-      featuredMaps={featuredMaps}
+      featuredMaps={featuredForHome}
+      showMoreFeatured={showMoreFeatured}
     />
   );
 }

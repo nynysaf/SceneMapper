@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabase } from '@/lib/supabase-server';
-import { sendDailyDigestEmail, type DigestMapEntry } from '@/lib/daily-digest-email';
+import { sendDailyDigestEmail, sendPlatformAdminFeatureRequestDigest, type DigestMapEntry } from '@/lib/daily-digest-email';
 
 /**
  * GET /api/cron/daily-digest
@@ -118,6 +118,30 @@ export async function GET(request: NextRequest) {
       const result = await sendDailyDigestEmail(email, entries);
       if (result.sent) sent++;
       else console.error('Daily digest send failed', email, result);
+    }
+
+    // Platform admin: feature requests from today (maps that requested to be featured, not yet approved)
+    const platformAdminEmails = (process.env.PLATFORM_ADMIN_EMAILS ?? 'naryan@gmail.com')
+      .split(',')
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean);
+    const { data: featureRequestMaps } = await supabase
+      .from('maps')
+      .select('id, title, slug, feature_requested_at, featured_order')
+      .not('feature_requested_at', 'is', null)
+      .is('featured_order', null)
+      .gte('feature_requested_at', startTs);
+
+    if (featureRequestMaps && featureRequestMaps.length > 0 && platformAdminEmails.length > 0) {
+      const featureEntries = featureRequestMaps.map((m) => ({
+        mapTitle: m.title ?? m.slug,
+        mapSlug: m.slug,
+      }));
+      for (const adminEmail of platformAdminEmails) {
+        const result = await sendPlatformAdminFeatureRequestDigest(adminEmail, featureEntries);
+        if (result.sent) sent++;
+        else console.error('Platform admin feature-request digest failed', adminEmail, result);
+      }
     }
 
     return NextResponse.json({ ok: true, sent, total: userToEntries.size });

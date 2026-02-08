@@ -44,6 +44,9 @@ export interface DbMap {
   map_template_id: string | null;
   element_config: Record<string, unknown> | null;
   connection_config: Record<string, unknown> | null;
+  feature_requested_at: string | null;
+  featured_order: number | null;
+  featured_active: boolean | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -128,6 +131,9 @@ export function dbMapToSceneMap(row: DbMap): SceneMap {
     icon: row.icon ?? undefined,
     iconBackground: row.icon_background ?? undefined,
     mapTemplateId: (row.map_template_id ?? undefined) as SceneMap['mapTemplateId'],
+    featureRequestedAt: row.feature_requested_at ?? undefined,
+    featuredOrder: row.featured_order != null ? row.featured_order : undefined,
+    featuredActive: row.featured_active ?? undefined,
     ...(() => {
       const raw = row.element_config as Record<string, unknown> | null | undefined;
       if (!raw || typeof raw !== 'object') {
@@ -209,6 +215,9 @@ export function sceneMapToDbMap(m: SceneMap): Omit<DbMap, 'created_at' | 'update
         ? { ...(m.elementConfig ?? {}), ...(m.elementOrder?.length ? { _order: m.elementOrder } : {}) }
         : null,
     connection_config: m.connectionConfig ?? null,
+    feature_requested_at: m.featureRequestedAt ?? null,
+    featured_order: m.featuredOrder ?? null,
+    featured_active: m.featuredActive ?? null,
   };
 }
 

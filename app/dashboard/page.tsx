@@ -8,6 +8,7 @@ import { getSession, getMaps, clearSession } from '../../lib/data';
 export default function DashboardPage() {
   const [sessionLoading, setSessionLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [platformAdmin, setPlatformAdmin] = useState(false);
   const [initialMaps, setInitialMaps] = useState<SceneMap[]>([]);
   const [initialEditSlug, setInitialEditSlug] = useState<string | undefined>(undefined);
 
@@ -27,6 +28,7 @@ export default function DashboardPage() {
             }
           : null;
         setCurrentUser(user);
+        setPlatformAdmin(!!session?.platformAdmin);
         setInitialMaps(maps);
       })
       .catch(() => {
@@ -143,6 +145,7 @@ export default function DashboardPage() {
     <Dashboard
       onNavigate={navigate}
       currentUser={currentUser}
+      platformAdmin={platformAdmin}
       onLogout={handleLogout}
       onLogin={handleLogin}
       onSignup={handleSignup}

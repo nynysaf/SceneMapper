@@ -1068,6 +1068,11 @@ const MapExperience: React.FC<MapExperienceProps> = ({
         activeFilters={activeFilters}
         onToggleFilter={toggleFilter}
         enabledNodeTypes={enabledNodeTypes}
+        enabledNodeTypesOrder={
+          map?.elementOrder?.length
+            ? [...map.elementOrder, NodeType.REGION].filter((t) => enabledNodeTypes.includes(t))
+            : undefined
+        }
         connectionsEnabled={connectionsEnabled}
         connectionsFilterOn={connectionsFilterOn}
         onConnectionsFilterToggle={() => setConnectionsFilterOn((v) => !v)}
@@ -1127,6 +1132,11 @@ const MapExperience: React.FC<MapExperienceProps> = ({
           onSubmitConnection={handleSubmitConnection}
           userRole={userSession.role}
           enabledNodeTypes={enabledNodeTypes}
+          enabledNodeTypesOrder={
+            map?.elementOrder?.length
+              ? [...map.elementOrder, NodeType.REGION].filter((t) => enabledNodeTypes.includes(t))
+              : undefined
+          }
           connectionsEnabled={connectionsEnabled}
           elementConfig={map?.elementConfig}
           mapTemplateId={map?.mapTemplateId}

@@ -29,11 +29,13 @@ interface LandingPageProps {
   onNavigate: (path: string) => void;
   currentUser: User | null;
   userMaps?: SceneMap[];
-  /** Maps to feature on the landing page; filtered by FEATURED_MAP_HREFS slugs. */
+  /** Maps to show in the Featured section (up to 6 on home). */
   featuredMaps?: SceneMap[];
+  /** When true, show a "More" button linking to /featured-maps. */
+  showMoreFeatured?: boolean;
 }
 
-const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, currentUser, userMaps = [], featuredMaps = [] }) => {
+const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, currentUser, userMaps = [], featuredMaps = [], showMoreFeatured = false }) => {
   const [logoError, setLogoError] = useState(false);
 
   const handleExampleHref = (href: string) => {
@@ -190,44 +192,52 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, currentUser, user
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {featuredMaps.length === 0 ? (
                   <p className="text-sm text-emerald-700 col-span-2 sm:col-span-3">
-                    No featured maps yet. Add links to <code className="text-[10px] bg-emerald-100 px-1 rounded">FEATURED_MAP_HREFS</code> in <code className="text-[10px] bg-emerald-100 px-1 rounded">LandingPage.tsx</code>.
+                    No featured maps yet.
                   </p>
                 ) : (
-                  featuredMaps.map((map) => {
-                    const href = FEATURED_MAP_HREFS.find((h) => slugFromHref(h) === map.slug) ?? `/maps/${map.slug}`;
-                    return (
-                      <button
-                        key={map.id}
-                        type="button"
-                        onClick={() => handleExampleHref(href)}
-                        className="flex flex-col rounded-2xl overflow-hidden border-2 border-emerald-100 hover:border-emerald-300 hover:shadow-md transition-all text-left bg-white/60"
-                      >
-                        <div className="aspect-video bg-emerald-100/80 flex items-center justify-center overflow-hidden">
-                          {map.backgroundImageUrl ? (
-                            <img
-                              src={map.backgroundImageUrl}
-                              alt=""
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <span className="text-2xl font-serif text-emerald-400">map</span>
-                          )}
-                        </div>
-                        <div className="p-2 min-h-[3rem]">
-                          <span className="text-xs font-semibold text-emerald-900 line-clamp-2">
-                            {map.title}
+                  featuredMaps.map((map) => (
+                    <button
+                      key={map.id}
+                      type="button"
+                      onClick={() => handleExampleHref(`/maps/${map.slug}`)}
+                      className="flex flex-col rounded-2xl overflow-hidden border-2 border-emerald-100 hover:border-emerald-300 hover:shadow-md transition-all text-left bg-white/60"
+                    >
+                      <div className="aspect-video bg-emerald-100/80 flex items-center justify-center overflow-hidden">
+                        {map.backgroundImageUrl ? (
+                          <img
+                            src={map.backgroundImageUrl}
+                            alt=""
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <span className="text-2xl font-serif text-emerald-400">map</span>
+                        )}
+                      </div>
+                      <div className="p-2 min-h-[3rem]">
+                        <span className="text-xs font-semibold text-emerald-900 line-clamp-2">
+                          {map.title}
+                        </span>
+                        {map.description && (
+                          <span className="text-[10px] text-emerald-600 line-clamp-2 block mt-0.5">
+                            {map.description}
                           </span>
-                          {map.description && (
-                            <span className="text-[10px] text-emerald-600 line-clamp-2 block mt-0.5">
-                              {map.description}
-                            </span>
-                          )}
-                        </div>
-                      </button>
-                    );
-                  })
+                        )}
+                      </div>
+                    </button>
+                  ))
                 )}
               </div>
+              {showMoreFeatured && (
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => onNavigate('/featured-maps')}
+                    className="text-sm font-semibold text-emerald-700 hover:text-emerald-900 underline"
+                  >
+                    More featured maps →
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </section>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { User, SceneMap, MapTheme } from '../types';
 import { NodeType } from '../types';
-import { getMaps, saveMaps, deleteMap, copyNodesToSlug, saveNodes, saveConnections, getConnections, isAbortError } from '../lib/data';
+import { getMaps, saveMaps, deleteMap, copyNodesToSlug, saveNodes, saveConnections, getConnections, getFeatureRequests, getFeaturedMaps, updateMapFeature, isAbortError } from '../lib/data';
 import {
   DEFAULT_ADMIN_SUBJECT,
   DEFAULT_ADMIN_BODY,
@@ -27,6 +27,8 @@ import { Trash2, Link2, QrCode, Pencil, X, Plus, Upload, Download, Image, Chevro
 interface DashboardProps {
   onNavigate: (path: string) => void;
   currentUser: User | null;
+  /** True when user is a platform admin (e.g. naryan@gmail.com). Enables feature-request and featured-maps management. */
+  platformAdmin?: boolean;
   onLogout: () => void;
   onLogin: (email: string, password: string) => { ok: boolean; error?: string } | Promise<{ ok: boolean; error?: string }>;
   onSignup: (name: string, email: string, password: string) => { ok: boolean; error?: string } | Promise<{ ok: boolean; error?: string }>;
@@ -161,6 +163,7 @@ const DEFAULT_THEME = THEME_PRESETS[0];
 const Dashboard: React.FC<DashboardProps> = ({
   onNavigate,
   currentUser,
+  platformAdmin = false,
   onLogout,
   onLogin,
   onSignup,
@@ -259,6 +262,27 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [advancedSectionOpen, setAdvancedSectionOpen] = useState(false);
   const [submitAsFeatured, setSubmitAsFeatured] = useState(false);
   const [isDuplicating, setIsDuplicating] = useState(false);
+  const [featureRequests, setFeatureRequests] = useState<SceneMap[]>([]);
+  const [featuredMaps, setFeaturedMaps] = useState<SceneMap[]>([]);
+  const [featureRequestAction, setFeatureRequestAction] = useState<string | null>(null);
+  const [featuredReordering, setFeaturedReordering] = useState(false);
+
+  useEffect(() => {
+    if (!platformAdmin || typeof window === 'undefined') return;
+    const ac = new AbortController();
+    Promise.all([
+      getFeatureRequests({ signal: ac.signal }),
+      getFeaturedMaps({ signal: ac.signal }),
+    ])
+      .then(([requests, featured]) => {
+        if (!ac.signal.aborted) {
+          setFeatureRequests(requests);
+          setFeaturedMaps(featured);
+        }
+      })
+      .catch(() => {});
+    return () => ac.abort();
+  }, [platformAdmin, featureRequestAction, featuredReordering]);
 
   const copyMapLink = (map: SceneMap) => {
     if (typeof window === 'undefined') return;
@@ -404,6 +428,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       match.elementOrder && match.elementOrder.length > 0 ? [...match.elementOrder] : [...REORDERABLE_NODE_TYPES],
     );
     setConnectionConfig(match.connectionConfig ?? undefined);
+    setSubmitAsFeatured(!!match.featureRequestedAt);
     setThemeSectionOpen(false);
     setRolesSectionOpen(false);
     setAdvancedSectionOpen(false);
@@ -589,6 +614,10 @@ const Dashboard: React.FC<DashboardProps> = ({
       elementConfig: elementConfig ?? undefined,
       elementOrder: elementOrder.length > 0 ? elementOrder : undefined,
       connectionConfig: connectionConfig ?? undefined,
+      featureRequestedAt:
+        submitAsFeatured
+          ? (editingMapId && maps.find((m) => m.id === editingMapId)?.featureRequestedAt) ?? new Date().toISOString()
+          : undefined,
     };
 
     if (backgroundImageUrl !== undefined) {
@@ -635,6 +664,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         elementConfig: baseFields.elementConfig,
         elementOrder: baseFields.elementOrder,
         connectionConfig: baseFields.connectionConfig,
+        featureRequestedAt: baseFields.featureRequestedAt,
       };
       nextMaps = [...maps, newMap];
       targetMapId = newMap.id;
@@ -1580,6 +1610,156 @@ const Dashboard: React.FC<DashboardProps> = ({
         </section>
 
         <section className="flex-1 max-w-md space-y-4">
+          {currentUser && platformAdmin && (
+            <div className="glass rounded-3xl p-6 solarpunk-shadow space-y-6">
+              <h3 className="text-sm font-semibold text-emerald-900 uppercase tracking-wide border-b border-emerald-100 pb-2">
+                Platform admin
+              </h3>
+              <div>
+                <h4 className="text-xs font-bold text-emerald-800 uppercase tracking-wide mb-2">Feature requests</h4>
+                {featureRequests.length === 0 ? (
+                  <p className="text-xs text-emerald-700">No pending requests.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {featureRequests.map((map) => (
+                      <li key={map.id} className="flex items-center justify-between gap-2 py-2 px-3 rounded-xl bg-amber-50/80 border border-amber-100">
+                        <div className="min-w-0 flex-1">
+                          <button type="button" onClick={() => onNavigate(`/maps/${map.slug}`)} className="text-left text-sm font-medium text-emerald-900 truncate block w-full hover:underline">
+                            {map.title}
+                          </button>
+                          <span className="text-[10px] text-emerald-600">/maps/{map.slug}</span>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              setFeatureRequestAction(map.slug);
+                              try {
+                                const nextOrder = Math.max(0, ...featuredMaps.map((m) => m.featuredOrder ?? 0)) + 1;
+                                await updateMapFeature(map.slug, { featuredOrder: nextOrder, featuredActive: true, clearFeatureRequest: true });
+                                setFeatureRequests((prev) => prev.filter((m) => m.id !== map.id));
+                                setFeaturedMaps((prev) => [...prev, { ...map, featuredOrder: nextOrder, featuredActive: true, featureRequestedAt: undefined }].sort((a, b) => (a.featuredOrder ?? 0) - (b.featuredOrder ?? 0)));
+                              } catch (e) {
+                                setMapError(e instanceof Error ? e.message : 'Failed to approve');
+                              } finally {
+                                setFeatureRequestAction(null);
+                              }
+                            }}
+                            disabled={!!featureRequestAction}
+                            className="px-2 py-1 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              setFeatureRequestAction(map.slug);
+                              try {
+                                await updateMapFeature(map.slug, { clearFeatureRequest: true });
+                                setFeatureRequests((prev) => prev.filter((m) => m.id !== map.id));
+                              } catch (e) {
+                                setMapError(e instanceof Error ? e.message : 'Failed to deny');
+                              } finally {
+                                setFeatureRequestAction(null);
+                              }
+                            }}
+                            disabled={!!featureRequestAction}
+                            className="px-2 py-1 rounded-lg text-xs font-semibold bg-white border border-rose-200 text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+                          >
+                            Deny
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-emerald-800 uppercase tracking-wide mb-2">Featured maps (drag to reorder)</h4>
+                {featuredMaps.length === 0 ? (
+                  <p className="text-xs text-emerald-700">No featured maps yet.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {featuredMaps.map((map, index) => (
+                      <li
+                        key={map.id}
+                        className="flex items-center gap-2 py-2 px-3 rounded-xl bg-white/70 border border-emerald-100"
+                      >
+                        <GripVertical className="w-4 h-4 text-emerald-500 shrink-0 cursor-grab" />
+                        <span className="text-[10px] font-mono text-emerald-600 w-5 shrink-0">{map.featuredOrder ?? index + 1}</span>
+                        <div className="min-w-0 flex-1">
+                          <button type="button" onClick={() => onNavigate(`/maps/${map.slug}`)} className="text-left text-sm font-medium text-emerald-900 truncate block w-full hover:underline">
+                            {map.title}
+                          </button>
+                        </div>
+                        <label className="flex items-center gap-1 shrink-0 text-[10px] font-semibold text-emerald-800">
+                          <input
+                            type="checkbox"
+                            checked={map.featuredActive ?? false}
+                            onChange={async (e) => {
+                              setFeaturedReordering(true);
+                              try {
+                                await updateMapFeature(map.slug, { featuredActive: e.target.checked });
+                                setFeaturedMaps((prev) => prev.map((m) => (m.id === map.id ? { ...m, featuredActive: e.target.checked } : m)));
+                              } finally {
+                                setFeaturedReordering(false);
+                              }
+                            }}
+                            className="rounded border-emerald-300 text-emerald-600"
+                          />
+                          On home
+                        </label>
+                        <button
+                          type="button"
+                          title="Move up"
+                          onClick={async () => {
+                            if (index === 0) return;
+                            setFeaturedReordering(true);
+                            try {
+                              const newOrder = [...featuredMaps];
+                              [newOrder[index - 1], newOrder[index]] = [newOrder[index], newOrder[index - 1]];
+                              for (let i = 0; i < newOrder.length; i++) {
+                                await updateMapFeature(newOrder[i].slug, { featuredOrder: i + 1 });
+                              }
+                              setFeaturedMaps(newOrder.map((m, i) => ({ ...m, featuredOrder: i + 1 })));
+                            } finally {
+                              setFeaturedReordering(false);
+                            }
+                          }}
+                          disabled={featuredReordering}
+                          className="p-1 rounded hover:bg-emerald-100 text-emerald-700 disabled:opacity-50"
+                        >
+                          <ChevronRight className="w-4 h-4 rotate-270" />
+                        </button>
+                        <button
+                          type="button"
+                          title="Move down"
+                          onClick={async () => {
+                            if (index >= featuredMaps.length - 1) return;
+                            setFeaturedReordering(true);
+                            try {
+                              const newOrder = [...featuredMaps];
+                              [newOrder[index], newOrder[index + 1]] = [newOrder[index + 1], newOrder[index]];
+                              for (let i = 0; i < newOrder.length; i++) {
+                                await updateMapFeature(newOrder[i].slug, { featuredOrder: i + 1 });
+                              }
+                              setFeaturedMaps(newOrder.map((m, i) => ({ ...m, featuredOrder: i + 1 })));
+                            } finally {
+                              setFeaturedReordering(false);
+                            }
+                          }}
+                          disabled={featuredReordering}
+                          className="p-1 rounded hover:bg-emerald-100 text-emerald-700 disabled:opacity-50"
+                        >
+                          <ChevronRight className="w-4 h-4 rotate-90" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          )}
           {currentUser && maps.length > 0 && (
             <div className="glass rounded-3xl p-6 solarpunk-shadow">
               <div className="flex items-center justify-between mb-3">

@@ -20,6 +20,8 @@ interface SidebarProps {
   onToggleFilter: (type: NodeType) => void;
   /** Node types enabled for this map; only these appear in the filter. When absent, all types shown. */
   enabledNodeTypes?: NodeType[];
+  /** Order to display enabled types (should match dashboard element order). When set, filter chips use this order. */
+  enabledNodeTypesOrder?: NodeType[];
   /** When false, Connections option is hidden from filter. Default true. */
   connectionsEnabled?: boolean;
   /** When true, connection lines are shown on the map. */
@@ -71,6 +73,7 @@ function Sidebar({
   activeFilters,
   onToggleFilter,
   enabledNodeTypes,
+  enabledNodeTypesOrder,
   connectionsEnabled = true,
   connectionsFilterOn,
   onConnectionsFilterToggle,
@@ -133,14 +136,16 @@ function Sidebar({
       setTimeout(() => setLinkCopied(false), 2000);
     });
   };
-  const filterOptions = (enabledNodeTypes ?? [
+  const defaultTypeOrder = [
     NodeType.EVENT,
     NodeType.PERSON,
     NodeType.SPACE,
     NodeType.COMMUNITY,
     NodeType.REGION,
     NodeType.MEDIA,
-  ])
+  ];
+  const filterOptions = (enabledNodeTypesOrder ?? enabledNodeTypes ?? defaultTypeOrder)
+    .filter((type) => (enabledNodeTypes?.includes(type) ?? true))
     .filter((type) => type !== NodeType.REGION || userRole === 'admin')
     .map((type) => ({
       type,

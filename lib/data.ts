@@ -222,7 +222,13 @@ async function getSessionApi(): Promise<AuthSession | null> {
   const r = await fetch(`${apiBase()}/api/auth/session`, { credentials: 'include' });
   if (!r.ok) return null;
   const data = await r.json();
-  return data && typeof data.userId === 'string' ? data : null;
+  if (!data || typeof data.userId !== 'string') return null;
+  return {
+    userId: data.userId,
+    email: data.email,
+    name: data.name,
+    platformAdmin: !!data.platformAdmin,
+  };
 }
 
 async function saveSessionApi(_session: AuthSession): Promise<void> {
@@ -269,6 +275,62 @@ export async function getMapBySlug(slug: string, options?: DataLayerOptions): Pr
   if (USE_BACKEND) return getMapBySlugApi(slug, options);
   const maps = await safeJson<SceneMap[]>(localStorage.getItem(KEY_MAPS), []);
   return maps.find((m) => m.slug === slug) ?? null;
+}
+
+async function getFeaturedMapsApi(options?: DataLayerOptions): Promise<SceneMap[]> {
+  const r = await fetch(`${apiBase()}/api/featured-maps`, {
+    credentials: 'include',
+    signal: options?.signal,
+  });
+  if (!r.ok) throw new Error(`getFeaturedMaps: ${r.status}`);
+  return r.json();
+}
+
+async function getFeatureRequestsApi(options?: DataLayerOptions): Promise<SceneMap[]> {
+  const r = await fetch(`${apiBase()}/api/admin/feature-requests`, {
+    credentials: 'include',
+    signal: options?.signal,
+  });
+  if (!r.ok) throw new Error(`getFeatureRequests: ${r.status}`);
+  return r.json();
+}
+
+export async function getFeaturedMaps(options?: DataLayerOptions): Promise<SceneMap[]> {
+  guard();
+  if (USE_BACKEND) return getFeaturedMapsApi(options);
+  const maps = await safeJson<SceneMap[]>(localStorage.getItem(KEY_MAPS), []);
+  return maps.filter((m) => m.featuredOrder != null).sort((a, b) => (a.featuredOrder ?? 0) - (b.featuredOrder ?? 0));
+}
+
+export async function getFeatureRequests(options?: DataLayerOptions): Promise<SceneMap[]> {
+  guard();
+  if (USE_BACKEND) return getFeatureRequestsApi(options);
+  return [];
+}
+
+export interface UpdateMapFeatureParams {
+  featuredOrder?: number | null;
+  featuredActive?: boolean;
+  clearFeatureRequest?: boolean;
+}
+
+export async function updateMapFeature(mapSlug: string, params: UpdateMapFeatureParams): Promise<void> {
+  guard();
+  if (!USE_BACKEND) return;
+  const r = await fetch(`${apiBase()}/api/maps/${encodeURIComponent(mapSlug)}`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  if (!r.ok) {
+    const body = await r.json().catch(() => ({}));
+    const msg =
+      typeof (body as { error?: string }).error === 'string'
+        ? (body as { error: string }).error
+        : `updateMapFeature: ${r.status}`;
+    throw new Error(msg);
+  }
 }
 
 /**

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import type { SceneMap } from '@/types';
 import { supabase } from '@/lib/supabase-server';
 import { dbMapToSceneMap } from '@/lib/db-mappers';
-import { getCurrentUserIdFromRequest, canAccessMap } from '@/lib/auth-api';
+import { getCurrentUserFromRequest, getCurrentUserIdFromRequest, canAccessMap, isPlatformAdminEmail } from '@/lib/auth-api';
 
 type RouteContext = { params: Promise<{ slug: string }> };
 
@@ -74,6 +74,52 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
     return new NextResponse(null, { status: 204 });
   } catch (err) {
     console.error('DELETE /api/maps/[slug]', err);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+/**
+ * PATCH /api/maps/[slug]/feature
+ * Update featured state (platform admin only). Body: { featuredOrder?: number | null, featuredActive?: boolean, clearFeatureRequest?: boolean }
+ */
+export async function PATCH(request: NextRequest, context: RouteContext) {
+  const { slug } = await context.params;
+  try {
+    const user = await getCurrentUserFromRequest(request);
+    if (!user || !isPlatformAdminEmail(user.email)) {
+      return NextResponse.json({ error: 'Platform admin only' }, { status: 403 });
+    }
+    const body = await request.json().catch(() => ({}));
+    const featuredOrder = body.featuredOrder !== undefined ? (body.featuredOrder as number | null) : undefined;
+    const featuredActive = body.featuredActive !== undefined ? !!body.featuredActive : undefined;
+    const clearFeatureRequest = !!body.clearFeatureRequest;
+
+    const { data: mapRow, error: fetchError } = await supabase
+      .from('maps')
+      .select('id, feature_requested_at, featured_order, featured_active')
+      .eq('slug', slug)
+      .maybeSingle();
+    if (fetchError || !mapRow) {
+      return NextResponse.json({ error: 'Map not found' }, { status: 404 });
+    }
+
+    const updates: Record<string, unknown> = {};
+    if (featuredOrder !== undefined) updates.featured_order = featuredOrder;
+    if (featuredActive !== undefined) updates.featured_active = featuredActive;
+    if (clearFeatureRequest) updates.feature_requested_at = null;
+
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ ok: true });
+    }
+
+    const { error: updateError } = await supabase.from('maps').update(updates).eq('id', mapRow.id);
+    if (updateError) {
+      console.error('PATCH /api/maps/[slug]/feature', updateError);
+      return NextResponse.json({ error: updateError.message }, { status: 500 });
+    }
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error('PATCH /api/maps/[slug]/feature', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

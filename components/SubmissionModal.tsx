@@ -17,6 +17,8 @@ interface SubmissionModalProps {
   approvedNodes?: MapNode[];
   /** Node types enabled for this map; only these appear as category options. When absent, all types shown. */
   enabledNodeTypes?: NodeType[];
+  /** Order to display categories (should match dashboard element order). When set, category buttons use this order. */
+  enabledNodeTypesOrder?: NodeType[];
   /** When false, CONNECTION option is hidden. Default true. */
   connectionsEnabled?: boolean;
   /** When set, opens with this category/kind preselected. */
@@ -33,6 +35,7 @@ const SubmissionModal: React.FC<SubmissionModalProps> = ({
   userRole,
   approvedNodes = [],
   enabledNodeTypes,
+  enabledNodeTypesOrder,
   connectionsEnabled = true,
   presetKind = null,
   elementConfig,
@@ -121,7 +124,8 @@ const SubmissionModal: React.FC<SubmissionModalProps> = ({
           <div className="space-y-2">
             <label className="text-sm font-bold text-emerald-900 block uppercase tracking-wide">Category</label>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-              {(enabledNodeTypes ?? Object.values(NodeType))
+              {(enabledNodeTypesOrder ?? enabledNodeTypes ?? Object.values(NodeType))
+                .filter((type) => (enabledNodeTypes?.includes(type) ?? true))
                 .filter((type) => type !== NodeType.REGION || userRole === 'admin')
                 .map(type => {
                   const label = getElementLabel(type, elementConfig, mapTemplateId);
