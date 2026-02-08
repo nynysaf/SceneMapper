@@ -1371,18 +1371,17 @@ const Dashboard: React.FC<DashboardProps> = ({
                               setIsUploading(true);
                               setUploadError(null);
                               try {
-                                const { getNodes, getConnections, saveNodes, saveConnections } = await import('../lib/data');
                                 const existingNodes = await getNodes(editingOriginalSlug);
                                 const existingConnections = await getConnections(editingOriginalSlug);
                                 const result = await parseXlsxFile(uploadFile, existingNodes, existingConnections);
-                                
+
                                 if (result.nodesAdded.length > 0) {
                                   await saveNodes(editingOriginalSlug, [...existingNodes, ...result.nodesAdded]);
                                 }
                                 if (result.connectionsAdded.length > 0) {
                                   await saveConnections(editingOriginalSlug, [...existingConnections, ...result.connectionsAdded]);
                                 }
-                                
+
                                 setUploadResult(result);
                               } catch (err) {
                                 const msg = err instanceof Error ? err.message : 'Upload failed';
