@@ -127,6 +127,8 @@ const MapExperience: React.FC<MapExperienceProps> = ({
   const nodesRef = useRef<MapNode[]>([]);
   const connectionsRef = useRef<MapConnection[]>([]);
   const slugWhenClearedRef = useRef<string | null>(null);
+  const nodesLoadFailedRef = useRef(false);
+  const connectionsLoadFailedRef = useRef(false);
   const [backgroundImageSize, setBackgroundImageSize] = useState<{ width: number; height: number } | null>(null);
 
   // Resolve background image dimensions for export (use when present, else default 1000x1000)
@@ -199,6 +201,8 @@ const MapExperience: React.FC<MapExperienceProps> = ({
     };
 
     if (initialNodes !== undefined && initialConnections !== undefined) {
+      nodesLoadFailedRef.current = false;
+      connectionsLoadFailedRef.current = false;
       setNodes(initialNodes);
       setConnections(initialConnections);
       nodesRef.current = initialNodes;
@@ -209,6 +213,8 @@ const MapExperience: React.FC<MapExperienceProps> = ({
       return () => ac.abort();
     }
 
+    nodesLoadFailedRef.current = false;
+    connectionsLoadFailedRef.current = false;
     Promise.all([
       loadNodes(effectiveSlug, opts),
       loadConnections(effectiveSlug, opts),
@@ -225,6 +231,8 @@ const MapExperience: React.FC<MapExperienceProps> = ({
       })
       .catch((err) => {
         if (isAbortError(err)) return;
+        nodesLoadFailedRef.current = true;
+        connectionsLoadFailedRef.current = true;
         setNodes(effectiveSlug === 'torontopia' ? INITIAL_NODES : []);
         setConnections([]);
         nodesRef.current = effectiveSlug === 'torontopia' ? INITIAL_NODES : [];
@@ -233,16 +241,15 @@ const MapExperience: React.FC<MapExperienceProps> = ({
     return () => ac.abort();
   }, [effectiveSlug, map, isDataLoading, initialNodes, initialConnections]);
 
-  // Flush nodes and connections on unmount so in-flight saves aren't lost when user closes/navigates away
+  // Flush nodes and connections on unmount so in-flight saves aren't lost when user closes/navigates away.
+  // Do not persist if the last load failed (would overwrite server with empty state).
   useEffect(() => {
     return () => {
       const slug = effectiveSlug;
       const n = nodesRef.current;
       const c = connectionsRef.current;
-      if (n.length > 0 || c.length > 0) {
-        void persistNodes(slug, n);
-        void persistConnections(slug, c);
-      }
+      if (!nodesLoadFailedRef.current) void persistNodes(slug, n);
+      if (!connectionsLoadFailedRef.current) void persistConnections(slug, c);
     };
   }, [effectiveSlug]);
 

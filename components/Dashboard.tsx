@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import type { User, SceneMap, MapTheme } from '../types';
+import type { User, SceneMap, MapTheme, MapNode, MapConnection } from '../types';
 import { NodeType } from '../types';
 import { getMaps, saveMaps, deleteMap, copyNodesToSlug, getNodes, saveNodes, getConnections, saveConnections, getFeatureRequests, getFeaturedMaps, updateMapFeature, isAbortError, getMapBackgroundUploadUrl, USE_BACKEND } from '../lib/data';
 import {
@@ -1370,16 +1370,61 @@ const Dashboard: React.FC<DashboardProps> = ({
                               if (!uploadFile || !editingOriginalSlug) return;
                               setIsUploading(true);
                               setUploadError(null);
+                              const slug = editingOriginalSlug;
                               try {
-                                const existingNodes = await getNodes(editingOriginalSlug);
-                                const existingConnections = await getConnections(editingOriginalSlug);
-                                const result = await parseXlsxFile(uploadFile, existingNodes, existingConnections);
+                                let existingNodes: MapNode[];
+                                let existingConnections: MapConnection[];
+                                try {
+                                  existingNodes = await getNodes(slug);
+                                } catch (e) {
+                                  setUploadError(
+                                    `Import failed while fetching existing nodes: ${e instanceof Error ? e.message : 'Unknown error'}. Check your connection and that the map exists.`
+                                  );
+                                  return;
+                                }
+                                try {
+                                  existingConnections = await getConnections(slug);
+                                } catch (e) {
+                                  setUploadError(
+                                    `Import failed while fetching existing connections: ${e instanceof Error ? e.message : 'Unknown error'}. Check your connection.`
+                                  );
+                                  return;
+                                }
+                                let result: Awaited<ReturnType<typeof parseXlsxFile>>;
+                                try {
+                                  result = await parseXlsxFile(uploadFile, existingNodes, existingConnections);
+                                } catch (e) {
+                                  setUploadError(
+                                    `Import failed while reading the spreadsheet: ${e instanceof Error ? e.message : 'Unknown error'}. Check the file format.`
+                                  );
+                                  return;
+                                }
 
                                 if (result.nodesAdded.length > 0) {
-                                  await saveNodes(editingOriginalSlug, [...existingNodes, ...result.nodesAdded]);
+                                  try {
+                                    await saveNodes(slug, [...existingNodes, ...result.nodesAdded]);
+                                  } catch (e) {
+                                    const msg = e instanceof Error ? e.message : 'Unknown error';
+                                    const hint =
+                                      /413|payload|large|network|fetch/i.test(msg)
+                                        ? ' Try fewer rows or split the file.'
+                                        : '';
+                                    setUploadError(`Import failed while saving nodes: ${msg}.${hint}`);
+                                    return;
+                                  }
                                 }
                                 if (result.connectionsAdded.length > 0) {
-                                  await saveConnections(editingOriginalSlug, [...existingConnections, ...result.connectionsAdded]);
+                                  try {
+                                    await saveConnections(slug, [...existingConnections, ...result.connectionsAdded]);
+                                  } catch (e) {
+                                    const msg = e instanceof Error ? e.message : 'Unknown error';
+                                    const hint =
+                                      /413|payload|large|network|fetch/i.test(msg)
+                                        ? ' Try fewer rows or split the file.'
+                                        : '';
+                                    setUploadError(`Import failed while saving connections: ${msg}.${hint}`);
+                                    return;
+                                  }
                                 }
 
                                 setUploadResult(result);

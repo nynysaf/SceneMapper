@@ -4,6 +4,8 @@ const nextConfig = {
     serverActions: {
       bodySizeLimit: '8mb',
     },
+    // Route Handler body limit (when applicable); helps large xlsx import PUTs
+    proxyClientMaxBodySize: '8mb',
   },
   async rewrites() {
     return {

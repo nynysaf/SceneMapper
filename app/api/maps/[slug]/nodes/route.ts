@@ -59,11 +59,18 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     }
     const nodes: MapNode[] = body;
 
-    const { data: existingConnections } = await supabase
+    const connectionsResult = await supabase
       .from('connections')
       .select('*')
       .eq('map_id', mapId);
-    const connectionRows = existingConnections ?? [];
+    if (connectionsResult.error) {
+      console.error('PUT /api/maps/[slug]/nodes fetch connections', connectionsResult.error);
+      return NextResponse.json(
+        { error: 'Failed to load existing connections; nodes were not updated.' },
+        { status: 500 }
+      );
+    }
+    const connectionRows = connectionsResult.data ?? [];
 
     await supabase.from('connections').delete().eq('map_id', mapId);
     await supabase.from('nodes').delete().eq('map_id', mapId);
