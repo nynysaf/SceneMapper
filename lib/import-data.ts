@@ -61,6 +61,35 @@ function parseConnectionRow(row: Record<string, unknown>, rowIndex: number): { c
   return { connection };
 }
 
+/** True if string looks like a UUID (used to accept either IDs or titles in connection columns). */
+function isUuid(s: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s.trim());
+}
+
+/** Resolve fromNodeId/toNodeId: if already UUID use as-is; otherwise match by node title (case-insensitive). */
+function resolveConnectionNodeIds(
+  conn: MapConnection,
+  allNodes: MapNode[]
+): { connection: MapConnection } | { error: string } {
+  const fromId = conn.fromNodeId.trim();
+  const toId = conn.toNodeId.trim();
+  const resolve = (value: string): string | null => {
+    if (isUuid(value)) return value;
+    const titleLower = value.toLowerCase();
+    const node = allNodes.find((n) => n.title.trim().toLowerCase() === titleLower);
+    return node ? node.id : null;
+  };
+  const resolvedFrom = resolve(fromId);
+  const resolvedTo = resolve(toId);
+  if (resolvedFrom == null)
+    return { error: `Could not find a node for "from": "${fromId}". Use a node ID (UUID) or the exact node title.` };
+  if (resolvedTo == null)
+    return { error: `Could not find a node for "to": "${toId}". Use a node ID (UUID) or the exact node title.` };
+  return {
+    connection: { ...conn, fromNodeId: resolvedFrom, toNodeId: resolvedTo },
+  };
+}
+
 /** Check if a node is a duplicate based on title and type (case-insensitive). */
 function isNodeDuplicate(node: MapNode, existingNodes: MapNode[]): boolean {
   const titleLower = node.title.toLowerCase();
@@ -140,17 +169,24 @@ export async function parseXlsxFile(
     }
   }
 
-  // Process Connections sheet
+  // Process Connections sheet (fromNodeId/toNodeId can be UUIDs or node titles)
   const connectionsSheet = workbook.Sheets['Connections'];
   if (connectionsSheet) {
+    const allNodes = [...existingNodes, ...result.nodesAdded];
     const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(connectionsSheet);
     for (let i = 0; i < rows.length; i++) {
-      const { connection, error } = parseConnectionRow(rows[i], i + 2);
-      if (error) {
-        result.errors.push(`Connections: ${error}`);
+      const parsed = parseConnectionRow(rows[i], i + 2);
+      if (parsed.error) {
+        result.errors.push(`Connections: ${parsed.error}`);
         continue;
       }
-      if (connection) {
+      if (parsed.connection) {
+        const resolved = resolveConnectionNodeIds(parsed.connection, allNodes);
+        if ('error' in resolved) {
+          result.errors.push(`Connections row ${i + 2}: ${resolved.error}`);
+          continue;
+        }
+        const connection = resolved.connection;
         const allConnections = [...existingConnections, ...result.connectionsAdded];
         if (isConnectionDuplicate(connection, allConnections)) {
           result.connectionsDuplicate++;
