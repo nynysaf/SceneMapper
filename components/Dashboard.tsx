@@ -1951,6 +1951,8 @@ const Dashboard: React.FC<DashboardProps> = ({
               <button
                 type="button"
                 onClick={() => {
+                  // Explicitly switch to "Create map" mode from any edit state.
+                  // Clears the currently edited map and resets the form to defaults.
                   setEditingMapId(null);
                   setEditingOriginalSlug(null);
                   setMapTitle('');

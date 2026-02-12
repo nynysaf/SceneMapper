@@ -276,6 +276,9 @@ const Map: React.FC<MapProps> = ({
             const d = pathD();
             group.selectAll('path').attr('d', d);
           };
+          // Track drag distance so tiny movements are treated as clicks (to open sidebar)
+          let dragStartX = 0;
+          let dragStartY = 0;
           const connectionDrag = d3
             .drag<SVGPathElement, unknown>()
             .subject(function () {
@@ -283,6 +286,8 @@ const Map: React.FC<MapProps> = ({
             })
             .on('start', function (event) {
               event.sourceEvent.stopPropagation();
+              dragStartX = event.x;
+              dragStartY = event.y;
               connectionJustDraggedRef.current = false;
               d3.select(this).style('cursor', 'grabbing');
             })
@@ -291,8 +296,19 @@ const Map: React.FC<MapProps> = ({
               cpyCur = Math.max(0, Math.min(1000, event.y));
               updatePaths();
             })
-            .on('end', function () {
+            .on('end', function (event) {
               d3.select(this).style('cursor', 'grab');
+              const dx = event.x - dragStartX;
+              const dy = event.y - dragStartY;
+              const movedSq = dx * dx + dy * dy;
+              // If the pointer barely moved, treat this as a click:
+              // reset curve to original and let the click handler open the sidebar.
+              if (movedSq <= DRAG_THRESHOLD_SQ) {
+                cpxCur = cpx;
+                cpyCur = cpy;
+                updatePaths();
+                return;
+              }
               connectionJustDraggedRef.current = true;
               setTimeout(() => {
                 connectionJustDraggedRef.current = false;
