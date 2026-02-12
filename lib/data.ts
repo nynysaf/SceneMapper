@@ -78,10 +78,17 @@ async function getMapPageDataApi(slug: string, options?: DataLayerOptions): Prom
   return r.json();
 }
 
-/** Vercel serverless request body limit is 4.5 MB. Keep under 4 MB to be safe. Background images are uploaded to Supabase Storage when using backend, so they are not part of this payload. */
-const SAVE_MAPS_BODY_LIMIT = 4 * 1024 * 1024;
-/** Same limit for nodes/connections PUT (e.g. xlsx import). */
-const SAVE_BODY_LIMIT = 4 * 1024 * 1024;
+/**
+ * Vercel serverless request body limit is ~4.5 MB, but some Next.js route
+ * handlers and proxies can have a lower effective limit (~1 MB) that surfaces
+ * to the client as a generic "NetworkError when attempting to fetch resource".
+ *
+ * To stay on the safe side for all environments, we keep our JSON payloads
+ * well below 1 MB and chunk larger saves on the client before sending.
+ */
+const SAVE_MAPS_BODY_LIMIT = 900 * 1024; // ~0.9 MB
+/** Same conservative limit for nodes/connections PUT (e.g. xlsx import). */
+const SAVE_BODY_LIMIT = 900 * 1024; // ~0.9 MB
 
 async function saveMapsApi(maps: SceneMap[]): Promise<void> {
   const body = JSON.stringify(maps);
