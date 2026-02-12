@@ -196,7 +196,9 @@ async function getNodesApi(mapSlug: string, options?: DataLayerOptions): Promise
 async function saveNodesApi(mapSlug: string, nodes: MapNode[]): Promise<void> {
   const body = JSON.stringify(nodes);
   if (body.length <= SAVE_BODY_LIMIT) {
-    const r = await fetch(`${apiBase()}/api/maps/${encodeURIComponent(mapSlug)}/nodes`, fetchOpts('PUT', nodes, true));
+    // Use standard fetch (no keepalive) to avoid browser keepalive body size limits that can surface
+    // as "NetworkError when attempting to fetch resource" on larger payloads.
+    const r = await fetch(`${apiBase()}/api/maps/${encodeURIComponent(mapSlug)}/nodes`, fetchOpts('PUT', nodes));
     if (!r.ok) {
       const resBody = await r.json().catch(() => ({}));
       const msg = typeof (resBody as { error?: string }).error === 'string' ? (resBody as { error: string }).error : `saveNodes: ${r.status}`;
@@ -212,7 +214,7 @@ async function saveNodesApi(mapSlug: string, nodes: MapNode[]): Promise<void> {
       const existing = await getNodesApi(mapSlug);
       current = [...existing, ...chunk];
     }
-    const r = await fetch(`${apiBase()}/api/maps/${encodeURIComponent(mapSlug)}/nodes`, fetchOpts('PUT', current, true));
+    const r = await fetch(`${apiBase()}/api/maps/${encodeURIComponent(mapSlug)}/nodes`, fetchOpts('PUT', current));
     if (!r.ok) {
       const resBody = await r.json().catch(() => ({}));
       const msg = typeof (resBody as { error?: string }).error === 'string' ? (resBody as { error: string }).error : `saveNodes: ${r.status}`;
@@ -235,7 +237,8 @@ async function getConnectionsApi(mapSlug: string, options?: DataLayerOptions): P
 async function saveConnectionsApi(mapSlug: string, connections: MapConnection[]): Promise<void> {
   const body = JSON.stringify(connections);
   if (body.length <= SAVE_BODY_LIMIT) {
-    const r = await fetch(`${apiBase()}/api/maps/${encodeURIComponent(mapSlug)}/connections`, fetchOpts('PUT', connections, true));
+    // Likewise, avoid keepalive here; connections payloads can also be large during imports.
+    const r = await fetch(`${apiBase()}/api/maps/${encodeURIComponent(mapSlug)}/connections`, fetchOpts('PUT', connections));
     if (!r.ok) {
       const resBody = await r.json().catch(() => ({}));
       const msg = typeof (resBody as { error?: string }).error === 'string' ? (resBody as { error: string }).error : `saveConnections: ${r.status}`;
@@ -251,7 +254,7 @@ async function saveConnectionsApi(mapSlug: string, connections: MapConnection[])
       const existing = await getConnectionsApi(mapSlug);
       current = [...existing, ...chunk];
     }
-    const r = await fetch(`${apiBase()}/api/maps/${encodeURIComponent(mapSlug)}/connections`, fetchOpts('PUT', current, true));
+    const r = await fetch(`${apiBase()}/api/maps/${encodeURIComponent(mapSlug)}/connections`, fetchOpts('PUT', current));
     if (!r.ok) {
       const resBody = await r.json().catch(() => ({}));
       const msg = typeof (resBody as { error?: string }).error === 'string' ? (resBody as { error: string }).error : `saveConnections: ${r.status}`;
