@@ -355,42 +355,23 @@ const Map: React.FC<MapProps> = ({
       .attr('stroke-opacity', (d: MapNode) => (d.status === 'pending' ? 0.7 : 1))
       .attr('stroke-dasharray', 'none');
 
-    // Label: wrapped to two lines, center justified (foreignObject for HTML wrapping)
-    const labelWidth = 120;
-    const labelLineHeight = 14;
-    const labelHeight = labelLineHeight * 2 + 4; // 2 lines + padding
+    // Label: for REGION use region font size and center; for others use label font size and offset
     nodeGroups.each(function (d: MapNode) {
       const g = d3.select(this);
       const isRegion = d.type === NodeType.REGION;
-      const fontSize = isRegion ? regionFontSize : labelFontSize;
-      const fo = g
-        .append('foreignObject')
-        .attr('x', -labelWidth / 2)
-        .attr('y', isRegion ? -labelHeight / 2 : labelDy - 4)
-        .attr('width', labelWidth)
-        .attr('height', labelHeight)
-        .attr('pointer-events', 'none');
-      const div = fo.append(() => document.createElementNS('http://www.w3.org/1999/xhtml', 'div'));
-      div
-        .style('width', '100%')
-        .style('max-width', '100%')
-        .style('text-align', 'center')
-        .style('font-size', `${fontSize}px`)
-        .style('font-weight', isRegion ? '600' : '700')
-        .style('line-height', `${labelLineHeight}px`)
-        .style('word-break', 'break-word')
-        .style('overflow-wrap', 'break-word')
-        .style('overflow', 'hidden')
-        .style('display', '-webkit-box')
-        .style('webkitLineClamp', '2')
-        .style('webkitBoxOrient', 'vertical')
-        .style('color', isRegion ? (categoryColors[d.type] ?? '#4a5568') : '#022c22')
-        .style('font-family', isRegion && regionFontFamily ? regionFontFamily : 'inherit')
-        .style('text-transform', isRegion ? 'none' : 'uppercase')
-        .style('letter-spacing', isRegion ? 'normal' : '0.05em')
-        .style('-webkit-text-stroke', isRegion ? 'none' : '2px #fdfcf0')
-        .style('paint-order', 'normal');
-      div.node()!.textContent = d.title;
+      g.append('text')
+        .text(d.title)
+        .attr('dy', isRegion ? 0 : labelDy)
+        .attr('text-anchor', 'middle')
+        .attr('class', isRegion ? 'font-semibold' : 'font-bold fill-emerald-950 pointer-events-none uppercase tracking-wider')
+        .style('font-size', isRegion ? `${regionFontSize}px` : `${labelFontSize}px`)
+        .style('font-family', isRegion && regionFontFamily ? regionFontFamily : undefined)
+        .style('fill', isRegion ? (categoryColors[d.type] ?? '#4a5568') : undefined)
+        .style('paint-order', isRegion ? undefined : 'stroke')
+        .style('stroke', isRegion ? undefined : '#fdfcf0')
+        .style('stroke-width', isRegion ? undefined : '4px')
+        .style('stroke-linecap', isRegion ? undefined : 'round')
+        .style('stroke-linejoin', isRegion ? undefined : 'round');
     });
 
     // --- Interaction Logic ---
