@@ -68,7 +68,11 @@ export async function GET(_request: NextRequest, context: RouteContext) {
     const nodes: MapNode[] = (nodesResult.data ?? []).map(dbNodeToMapNode);
     const connections: MapConnection[] = (connectionsResult.data ?? []).map(dbConnectionToMapConnection);
 
-    return NextResponse.json<MapPageResponse>({ map, nodes, connections });
+    const res = NextResponse.json<MapPageResponse>({ map, nodes, connections });
+    if (mapRow.public_view === true) {
+      res.headers.set('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=60');
+    }
+    return res;
   } catch (err) {
     console.error('GET /api/maps/[slug]/page', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

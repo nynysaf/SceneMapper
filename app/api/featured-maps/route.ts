@@ -19,7 +19,11 @@ export async function GET() {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
     const maps: SceneMap[] = (data ?? []).map(dbMapToSceneMap);
-    return NextResponse.json(maps);
+    return NextResponse.json(maps, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
+      },
+    });
   } catch (err) {
     console.error('GET /api/featured-maps', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

@@ -38,7 +38,11 @@ export async function GET(request: NextRequest) {
       });
     }
     const maps: SceneMap[] = rows.map(dbMapToSceneMap);
-    return NextResponse.json(maps);
+    const res = NextResponse.json(maps);
+    if (!userId) {
+      res.headers.set('Cache-Control', 'public, s-maxage=30');
+    }
+    return res;
   } catch (err) {
     console.error('GET /api/maps', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

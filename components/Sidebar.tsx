@@ -33,6 +33,10 @@ interface SidebarProps {
   /** When user clicks a connection line; show description in sidebar. */
   selectedConnection?: MapConnection | null;
   onClearConnectionSelection?: () => void;
+  /** Called when user clicks Edit on a selected connection in the sidebar. */
+  onEditConnection?: (connection: MapConnection) => void;
+  /** Called when user clicks Delete on a selected connection in the sidebar. */
+  onRequestDeleteConnection?: (connection: MapConnection) => void;
   /** Used to resolve connection from/to node titles when showing selected connection. */
   nodes?: MapNode[];
   userRole: string;
@@ -86,6 +90,8 @@ function Sidebar({
   onClearSelection,
   selectedConnection = null,
   onClearConnectionSelection,
+  onEditConnection,
+  onRequestDeleteConnection,
   nodes = [],
   userRole,
   mapTheme,
@@ -199,15 +205,35 @@ function Sidebar({
               <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest text-white bg-emerald-600">
                 {connectionLabel}
               </span>
-              {onClearConnectionSelection && (
-                <button
-                  onClick={onClearConnectionSelection}
-                  className="text-emerald-800 hover:bg-emerald-100 p-1 rounded-full transition-colors"
-                  title="Close"
-                >
-                  <X size={20} />
-                </button>
-              )}
+              <div className="flex items-center gap-1">
+                {userRole !== 'public' && onEditConnection && (
+                  <button
+                    onClick={() => onEditConnection(selectedConnection)}
+                    className="text-emerald-800 hover:bg-emerald-100 p-1 rounded-full transition-colors"
+                    title="Edit connection"
+                  >
+                    <Pencil size={16} />
+                  </button>
+                )}
+                {userRole === 'admin' && onRequestDeleteConnection && (
+                  <button
+                    onClick={() => onRequestDeleteConnection(selectedConnection)}
+                    className="text-rose-700 hover:bg-rose-50 p-1 rounded-full transition-colors"
+                    title="Delete connection"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
+                {onClearConnectionSelection && (
+                  <button
+                    onClick={onClearConnectionSelection}
+                    className="text-emerald-800 hover:bg-emerald-100 p-1 rounded-full transition-colors"
+                    title="Close"
+                  >
+                    <X size={20} />
+                  </button>
+                )}
+              </div>
             </div>
             {nodes.length > 0 && (() => {
               const fromNode = nodes.find((n) => n.id === selectedConnection.fromNodeId);

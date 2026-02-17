@@ -114,6 +114,9 @@ const MapExperience: React.FC<MapExperienceProps> = ({
   const [editWebsite, setEditWebsite] = useState('');
   const [editType, setEditType] = useState<NodeType>(NodeType.EVENT);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [isEditConnectionOpen, setIsEditConnectionOpen] = useState(false);
+  const [editConnectionDescription, setEditConnectionDescription] = useState('');
+  const [isDeleteConnectionConfirmOpen, setIsDeleteConnectionConfirmOpen] = useState(false);
   const [hasShownReviewThisSession, setHasShownReviewThisSession] = useState(false);
   const [nodeSizeScale, setNodeSizeScale] = useState(1);
   const [nodeLabelFontScale, setNodeLabelFontScale] = useState(1);
@@ -798,6 +801,38 @@ const MapExperience: React.FC<MapExperienceProps> = ({
     setIsEditOpen(false);
   };
 
+  const startEditConnection = (connection: MapConnection) => {
+    setSelectedConnection(connection);
+    setEditConnectionDescription(connection.description);
+    setIsEditConnectionOpen(true);
+  };
+
+  const handleSaveEditConnection = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedConnection) return;
+    const updatedConnections = connections.map((c) =>
+      c.id === selectedConnection.id ? { ...c, description: editConnectionDescription } : c,
+    );
+    saveConnections(updatedConnections);
+    const updated =
+      updatedConnections.find((c) => c.id === selectedConnection.id) || selectedConnection;
+    setSelectedConnection(updated);
+    setIsEditConnectionOpen(false);
+  };
+
+  const requestDeleteConnection = (connection: MapConnection) => {
+    setSelectedConnection(connection);
+    setIsDeleteConnectionConfirmOpen(true);
+  };
+
+  const handleConfirmDeleteConnection = () => {
+    if (!selectedConnection) return;
+    const updatedConnections = connections.filter((c) => c.id !== selectedConnection.id);
+    saveConnections(updatedConnections);
+    setSelectedConnection(null);
+    setIsDeleteConnectionConfirmOpen(false);
+  };
+
   // Persist last known title so it doesn't disappear on mobile when map area is panned/left
   const lastTitleRef = useRef(mapTitle ?? '');
   if (mapTitle) lastTitleRef.current = mapTitle;
@@ -1101,6 +1136,10 @@ const MapExperience: React.FC<MapExperienceProps> = ({
         }}
         selectedConnection={selectedConnection}
         onClearConnectionSelection={() => setSelectedConnection(null)}
+        onEditConnection={userSession.role === 'public' ? undefined : startEditConnection}
+        onRequestDeleteConnection={
+          userSession.role === 'admin' ? requestDeleteConnection : undefined
+        }
         nodes={nodes}
         userRole={userSession.role}
         mapTheme={mapTheme}
@@ -1274,6 +1313,50 @@ const MapExperience: React.FC<MapExperienceProps> = ({
         </div>
       )}
 
+      {/* Edit connection modal — safe area insets */}
+      {isEditConnectionOpen && selectedConnection && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] bg-emerald-950/20 backdrop-blur-sm"
+          onClick={() => setIsEditConnectionOpen(false)}
+        >
+          <div
+            className="glass w-full max-w-lg rounded-3xl solarpunk-shadow overflow-hidden flex flex-col animate-in fade-in zoom-in duration-300 max-h-[calc(100vh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-2rem)] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6 border-b border-emerald-100 flex justify-between items-center bg-white/50">
+              <h2 className="text-2xl font-bold text-emerald-950">Edit connection</h2>
+              <button
+                onClick={() => setIsEditConnectionOpen(false)}
+                className="p-2 hover:bg-emerald-100 rounded-full transition-colors"
+              >
+                <X size={24} className="text-emerald-800" />
+              </button>
+            </div>
+            <form
+              onSubmit={handleSaveEditConnection}
+              className="p-8 space-y-6 overflow-y-auto max-h-[70vh] bg-white/40"
+            >
+              <div className="space-y-1">
+                <label className="text-[11px] font-semibold text-emerald-900">
+                  Description
+                </label>
+                <textarea
+                  className="w-full bg-white/80 border border-emerald-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-400 min-h-[120px]"
+                  value={editConnectionDescription}
+                  onChange={(e) => setEditConnectionDescription(e.target.value)}
+                />
+              </div>
+              <button
+                type="submit"
+                className="mt-2 w-full bg-emerald-600 text-white py-2.5 rounded-2xl font-semibold text-sm hover:bg-emerald-700 transition-colors"
+              >
+                Save changes
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Delete confirmation modal — safe area insets */}
       {isDeleteConfirmOpen && selectedNode && (
         <div
@@ -1312,6 +1395,50 @@ const MapExperience: React.FC<MapExperienceProps> = ({
                   className="px-4 py-2 rounded-xl text-xs font-semibold bg-rose-600 text-white hover:bg-rose-700"
                 >
                   Delete node
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete connection confirmation modal — safe area insets */}
+      {isDeleteConnectionConfirmOpen && selectedConnection && (
+        <div
+          className="fixed inset-0 z-[65] flex items-center justify-center p-4 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] bg-emerald-950/30 backdrop-blur-sm"
+          onClick={() => setIsDeleteConnectionConfirmOpen(false)}
+        >
+          <div
+            className="glass w-full max-w-sm rounded-3xl solarpunk-shadow overflow-hidden flex flex-col animate-in fade-in zoom-in duration-300 max-h-[calc(100vh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-2rem)] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-5 border-b border-emerald-100 bg-white/60 flex justify-between items-center">
+              <h2 className="text-lg font-bold text-emerald-950">Delete connection?</h2>
+              <button
+                onClick={() => setIsDeleteConnectionConfirmOpen(false)}
+                className="p-1 rounded-full hover:bg-emerald-100 text-emerald-800 text-xs font-semibold"
+              >
+                Cancel
+              </button>
+            </div>
+            <div className="p-5 space-y-4 bg-white/40">
+              <p className="text-sm text-emerald-900">
+                This will remove this connection from the map. This action cannot be undone.
+              </p>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsDeleteConnectionConfirmOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-emerald-800 hover:bg-emerald-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDeleteConnection}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-rose-600 text-white hover:bg-rose-700"
+                >
+                  Delete connection
                 </button>
               </div>
             </div>

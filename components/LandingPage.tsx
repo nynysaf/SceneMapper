@@ -219,7 +219,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, currentUser, user
                         </span>
                         {map.description && (
                           <span className="text-[10px] text-emerald-600 line-clamp-2 block mt-0.5">
-                            {map.description}
+                            {map.description.length > 150
+                              ? `${map.description.slice(0, 150).trim()}...`
+                              : map.description}
                           </span>
                         )}
                       </div>

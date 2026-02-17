@@ -78,7 +78,9 @@ export default function FeaturedMapsPage() {
                   </span>
                   {map.description && (
                     <span className="text-xs text-emerald-600 line-clamp-2 block mt-1">
-                      {map.description}
+                      {map.description.length > 150
+                        ? `${map.description.slice(0, 150).trim()}...`
+                        : map.description}
                     </span>
                   )}
                 </div>
