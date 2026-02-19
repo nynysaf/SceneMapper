@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import type { MapNode } from '@/types';
 import { supabase } from '@/lib/supabase-server';
 import { dbNodeToMapNode, mapNodeToDbNode } from '@/lib/db-mappers';
+import { getCurrentUserIdFromRequest, canEditMap } from '@/lib/auth-api';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 function ensureUuid(id: string | undefined): string {
@@ -46,10 +47,21 @@ export async function GET(_request: NextRequest, context: RouteContext) {
 export async function PUT(request: NextRequest, context: RouteContext) {
   const { slug } = await context.params;
   try {
-    const { data: mapRow, error: mapError } = await supabase.from('maps').select('id').eq('slug', slug).maybeSingle();
+    const userId = await getCurrentUserIdFromRequest(request);
+    if (!userId) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }
+    const { data: mapRow, error: mapError } = await supabase
+      .from('maps')
+      .select('id, admin_ids, collaborator_ids')
+      .eq('slug', slug)
+      .maybeSingle();
     if (mapError || !mapRow) {
       if (mapError) console.error('PUT /api/maps/[slug]/nodes map', mapError);
       return NextResponse.json({ error: 'Map not found' }, { status: 404 });
+    }
+    if (!canEditMap(mapRow, userId)) {
+      return NextResponse.json({ error: 'You must be an admin or collaborator to edit this map' }, { status: 403 });
     }
     const mapId = mapRow.id;
 

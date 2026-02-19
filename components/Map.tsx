@@ -180,14 +180,14 @@ const Map: React.FC<MapProps> = ({
       svg.on('.zoom', null);
     } else if (!isPlacing) {
       svg.call(zoom);
-      // Initial load: fit full map (1000×1000) to view, centered with padding
+      // Initial load: align top of map with top of viewport, horizontally centered.
       if (!hasFittedInitialRef.current) {
         hasFittedInitialRef.current = true;
         const padding = 0.05;
         const k = 1 - 2 * padding;
-        const cx = 500;
-        const ty = cx * (1 - k);
-        const initial = d3.zoomIdentity.translate(ty, ty).scale(k);
+        const tx = 500 * (1 - k); // horizontal center
+        const ty = 0;              // top of map at top of viewport
+        const initial = d3.zoomIdentity.translate(tx, ty).scale(k);
         requestAnimationFrame(() => {
           if (svgRef.current) {
             d3.select(svgRef.current).call(zoom.transform, initial);

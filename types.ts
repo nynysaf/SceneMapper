@@ -94,6 +94,11 @@ export interface SceneMap {
   backgroundImageUrl?: string;
   theme: MapTheme;
   collaboratorPassword?: string;
+  /**
+   * When true, map has a collaborator password set (allows "Join as collaborator").
+   * Sent from API instead of plaintext password.
+   */
+  hasCollaboratorPassword?: boolean;
   adminIds: string[];
   collaboratorIds: string[];
   publicView: boolean;

@@ -191,7 +191,7 @@ const MapExperience: React.FC<MapExperienceProps> = ({
       const currentUser = { id: session.userId, email: session.email ?? '', name: session.name ?? 'User' };
       let role: UserSession['role'] = 'public';
       if (map) {
-        setHasCollaboratorPassword(!!map.collaboratorPassword);
+        setHasCollaboratorPassword(!!(map.hasCollaboratorPassword ?? map.collaboratorPassword));
         if (map.adminIds.includes(currentUser.id)) role = 'admin';
         else if (map.collaboratorIds.includes(currentUser.id)) role = 'collaborator';
       }
@@ -482,7 +482,7 @@ const MapExperience: React.FC<MapExperienceProps> = ({
     [connections, saveConnections],
   );
 
-  // --- Filtering & Role Switching ---
+  // --- Filtering ---
 
   const toggleFilter = (type: NodeType) => {
     setActiveFilters((prev) =>
@@ -490,12 +490,18 @@ const MapExperience: React.FC<MapExperienceProps> = ({
     );
   };
 
-  // Cycles through roles for demonstration purposes
-  const switchRole = () => {
-    const roles: UserSession['role'][] = ['public', 'collaborator', 'admin'];
-    const nextRole = roles[(roles.indexOf(userSession.role) + 1) % roles.length];
-    setUserSession({ role: nextRole, name: nextRole === 'public' ? 'Guest' : 'Expert' });
-    setPendingNode(null);
+  // Permissions card: public users can only open join modal when authorized path exists.
+  // Collaborator/admin: display-only label (no role switching).
+  const canJoinAsCollaborator =
+    hasCollaboratorPassword && userSession.role === 'public' && !!userSession.id && !!mapSlug;
+  const hasPathToCollaborator = canJoinAsCollaborator;
+  const isPermissionsCardClickable = hasPathToCollaborator; // Only when "Join as collaborator" applies
+  const handlePermissionsCardClick = () => {
+    if (isPermissionsCardClickable) {
+      setIsJoinOpen(true);
+      setJoinPassword('');
+      setJoinError(null);
+    }
   };
 
   // Computed data for UI
@@ -1446,16 +1452,28 @@ const MapExperience: React.FC<MapExperienceProps> = ({
         </div>
       )}
 
-      {/* Permissions mode — bottom-left (replaces "Click around and find out") */}
+      {/* Permissions / role label — bottom-left. No role switching; clickable only to open Join modal when applicable. */}
       <div className="absolute bottom-[max(1.5rem,env(safe-area-inset-bottom))] md:bottom-10 left-4 md:left-6 z-40">
         {pendingNode ? (
           <div className="glass p-3 px-5 rounded-full text-xs font-semibold text-emerald-800 solarpunk-shadow border-emerald-200">
             🌱 Select a location on the map.
           </div>
-        ) : (
+        ) : isPermissionsCardClickable ? (
           <button
-            onClick={switchRole}
-            className="glass px-3 py-2 md:px-4 md:py-2.5 rounded-xl md:rounded-2xl text-xs md:text-sm font-semibold flex items-center gap-1.5 md:gap-2 text-emerald-800 hover:bg-emerald-50/80 transition-colors solarpunk-shadow border-emerald-200 min-h-[44px] md:min-h-0"
+            onClick={handlePermissionsCardClick}
+            className="glass px-3 py-2 md:px-4 md:py-2.5 rounded-xl md:rounded-2xl text-xs md:text-sm font-semibold flex items-center gap-1.5 md:gap-2 text-emerald-800 hover:bg-emerald-50/80 transition-colors solarpunk-shadow border-emerald-200 min-h-[44px] md:min-h-0 cursor-pointer"
+            type="button"
+          >
+            <Users size={16} className="md:w-[18px] md:h-[18px]" />
+            <span>Join as collaborator</span>
+          </button>
+        ) : (
+          <div
+            className={`glass px-3 py-2 md:px-4 md:py-2.5 rounded-xl md:rounded-2xl text-xs md:text-sm font-semibold flex items-center gap-1.5 md:gap-2 solarpunk-shadow border-emerald-200 min-h-[44px] md:min-h-0 ${
+              userSession.role === 'public' && !hasCollaboratorPassword
+                ? 'text-emerald-600/70 opacity-80'
+                : 'text-emerald-800'
+            }`}
           >
             {userSession.role === 'admin' ? (
               <ShieldCheck size={16} className="md:w-[18px] md:h-[18px]" />
@@ -1464,8 +1482,12 @@ const MapExperience: React.FC<MapExperienceProps> = ({
             ) : (
               <Info size={16} className="md:w-[18px] md:h-[18px]" />
             )}
-            <span>{userSession.role.charAt(0).toUpperCase() + userSession.role.slice(1)}</span>
-          </button>
+            <span>
+              {userSession.role === 'public'
+                ? 'Viewing as public'
+                : userSession.role.charAt(0).toUpperCase() + userSession.role.slice(1)}
+            </span>
+          </div>
         )}
       </div>
     </div>

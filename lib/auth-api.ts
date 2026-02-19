@@ -58,3 +58,24 @@ export function canAccessMap(
   const collaboratorIds = row.collaborator_ids ?? [];
   return adminIds.includes(userId) || collaboratorIds.includes(userId);
 }
+
+/** True if user is admin or collaborator for the map (can edit nodes/connections). */
+export function canEditMap(
+  row: { admin_ids?: string[]; collaborator_ids?: string[] },
+  userId: string | null,
+): boolean {
+  if (!userId) return false;
+  const adminIds = row.admin_ids ?? [];
+  const collaboratorIds = row.collaborator_ids ?? [];
+  return adminIds.includes(userId) || collaboratorIds.includes(userId);
+}
+
+/** True if user is admin for the map. */
+export function isMapAdmin(
+  row: { admin_ids?: string[] },
+  userId: string | null,
+): boolean {
+  if (!userId) return false;
+  const adminIds = row.admin_ids ?? [];
+  return Array.isArray(adminIds) && adminIds.includes(userId);
+}

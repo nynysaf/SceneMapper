@@ -112,6 +112,7 @@ export function dbMapToSceneMap(row: DbMap): SceneMap {
     backgroundImageUrl: row.background_image_url ?? undefined,
     theme,
     collaboratorPassword: undefined, // never send password to client
+    hasCollaboratorPassword: !!(row.collaborator_password_hash),
     adminIds: row.admin_ids ?? [],
     collaboratorIds: row.collaborator_ids ?? [],
     publicView: row.public_view ?? true,

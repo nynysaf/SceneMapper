@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase-server';
 import { dbMapToSceneMap, sceneMapToDbMap } from '@/lib/db-mappers';
 import { hashPassword } from '@/lib/password';
 import { sendInvitationEmail } from '@/lib/invitation-email';
-import { getCurrentUserIdFromRequest } from '@/lib/auth-api';
+import { getCurrentUserIdFromRequest, isMapAdmin } from '@/lib/auth-api';
 
 /**
  * GET /api/maps
@@ -68,6 +68,10 @@ function ensureUuid(id: string | undefined): string {
  */
 export async function POST(request: NextRequest) {
   try {
+    const userId = await getCurrentUserIdFromRequest(request);
+    if (!userId) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }
     const body = await request.json();
     const rawMaps = Array.isArray(body) ? body : [body];
     if (rawMaps.length === 0) {
@@ -78,23 +82,31 @@ export async function POST(request: NextRequest) {
       id: ensureUuid(m.id),
     }));
 
-    // Fetch existing maps (by id) to diff invited emails before upsert.
+    // Fetch existing maps (by id) to diff invited emails and check admin permission.
     // Use ensureUuid so we never pass a non-UUID to Postgres (avoids 500 when client sends old short ids).
-    const existingById: Record<string, { invitedAdminEmails: string[]; invitedCollaboratorEmails: string[] }> = {};
+    const existingById: Record<string, { invitedAdminEmails: string[]; invitedCollaboratorEmails: string[]; adminIds?: string[] }> = {};
     for (const m of maps) {
       const mapId = ensureUuid(m.id);
       const { data: existing } = await supabase
         .from('maps')
-        .select('invited_admin_emails, invited_collaborator_emails')
+        .select('invited_admin_emails, invited_collaborator_emails, admin_ids')
         .eq('id', mapId)
         .maybeSingle();
       if (existing) {
         existingById[mapId] = {
           invitedAdminEmails: normalizeEmails((existing as { invited_admin_emails?: string[] }).invited_admin_emails),
           invitedCollaboratorEmails: normalizeEmails((existing as { invited_collaborator_emails?: string[] }).invited_collaborator_emails),
+          adminIds: (existing as { admin_ids?: string[] }).admin_ids ?? [],
         };
+        if (!isMapAdmin(existing, userId)) {
+          return NextResponse.json(
+            { error: 'Only map admins can update this map' },
+            { status: 403 }
+          );
+        }
       } else {
         existingById[mapId] = { invitedAdminEmails: [], invitedCollaboratorEmails: [] };
+        // New map: creator must include themselves in adminIds (client responsibility)
       }
     }
 
