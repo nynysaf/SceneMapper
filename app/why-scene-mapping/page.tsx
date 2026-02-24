@@ -5,7 +5,7 @@ import Image from 'next/image';
 
 /**
  * "Why scene mapping?" — Long-form article on scene consciousness and collective mapping.
- * Content from scene_consciousness_blog.md.
+ * Content from docs/scene_consciousness_blog.md (canonical source).
  */
 export default function WhySceneMappingPage() {
   return (
@@ -17,9 +17,12 @@ export default function WhySceneMappingPage() {
       </header>
       <main className="max-w-2xl mx-auto px-6 py-12 space-y-12">
         <header>
-          <h1 className="text-3xl md:text-4xl font-bold text-emerald-950 leading-tight mb-4">
+          <h1 className="text-3xl md:text-4xl font-bold text-emerald-950 leading-tight mb-2">
             When Scenes See Themselves: Mapping the Collective Consciousness of Culture
           </h1>
+          <p className="text-lg text-emerald-700 font-medium mb-4">
+            Why scene mapping?
+          </p>
         </header>
 
         <figure className="rounded-2xl overflow-hidden border border-emerald-100 shadow-md">
@@ -431,59 +434,6 @@ export default function WhySceneMappingPage() {
               className="w-full h-auto object-cover"
             />
           </figure>
-        </section>
-
-        <section>
-          <h2 className="text-2xl font-bold text-emerald-950 mb-4">An Improvisational Future</h2>
-          <div className="space-y-4 text-emerald-800 leading-relaxed">
-            <p>
-              Let me get a little hand-wavy for a moment. I want to imagine something specific
-              about what becomes possible.
-            </p>
-            <p>
-              I imagine Toronto becoming a place of world-class facilitation. Not in a
-              credentialing or professionalization sense, but in an embodied cultural sense.
-              Where the frequency of &quot;home run&quot; events — the kind where both hosts and
-              guests say &quot;that was way better than I imagined&quot; — doubles, then doubles
-              again.
-            </p>
-            <p>
-              I imagine an improvisational scene. Not literally improv comedy (though Toronto has
-              great improv scenes too), but a culture where hosts attend each other&apos;s events,
-              draw inspiration, build on each other&apos;s innovations &quot;yes-and&quot; style.
-              The way impressionist painters in Paris sparked each other into new expressions. The
-              way Nashville has a sound that just <em>hits different</em>.
-            </p>
-            <p>
-              In this imagined future, my son — who&apos;s arriving this spring — grows up
-              assuming that any random group of neighbours could work and play together
-              effectively. That difference makes groups stronger rather than weaker. That there
-              are practices for discovering shared values across different ages, economics,
-              identities, and backgrounds.
-            </p>
-            <p>
-              Right now, that&apos;s not my assumption about random Torontonians. We live in
-              tremendous diversity but without the capacity to really integrate our differences.
-              We fracture into parts. One government installs bike lanes, another removes them.
-              We lose opportunities to support each other with our unique gifts.
-            </p>
-            <p>
-              But within our city, there are spaces where people gather through shared interests
-              and learn to listen to each other deeply. To hold ego lightly. To be co-creators
-              rather than consumers. To care for &quot;we&quot; as well as &quot;me.&quot;
-            </p>
-            <p>
-              This vibe seems to be part of the golden thread connecting the scene I see. The
-              topic almost doesn&apos;t matter — whether it&apos;s somatics or economics or
-              philosophy or dance. What matters is the quality of attunement that facilitators
-              bring, the container they create for something more than transactions.
-            </p>
-            <p>
-              Great facilitation opens new worlds of possibility. Events where each
-              participant&apos;s presence matters. Well-designed gatherings that invite us to be
-              the people we want to be, doing more than we imagined possible.
-            </p>
-          </div>
         </section>
 
         <section>
