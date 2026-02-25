@@ -482,6 +482,67 @@ export async function saveConnections(mapSlug: string, connections: MapConnectio
   localStorage.setItem(key, JSON.stringify(connections));
 }
 
+/** Public submission: insert a single node (no auth). Use when user is public. Returns created node id. */
+export async function submitNode(
+  mapSlug: string,
+  node: Omit<MapNode, 'id' | 'collaboratorId' | 'status'>,
+  options?: DataLayerOptions
+): Promise<{ id: string }> {
+  guard();
+  if (!USE_BACKEND) {
+    throw new Error('Public submission requires backend');
+  }
+  const r = await fetch(`${apiBase()}/api/maps/${encodeURIComponent(mapSlug)}/submissions/nodes`, {
+    ...fetchOpts('POST', {
+      type: node.type,
+      title: node.title,
+      description: node.description ?? '',
+      website: node.website ?? null,
+      x: node.x,
+      y: node.y,
+      tags: node.tags ?? [],
+      primaryTag: node.primaryTag ?? 'other',
+    }),
+    signal: options?.signal,
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    const msg = typeof (data as { error?: string }).error === 'string' ? (data as { error: string }).error : `submitNode: ${r.status}`;
+    throw new Error(msg);
+  }
+  const id = (data as { id?: string }).id;
+  if (!id) throw new Error('Invalid response from submit node');
+  return { id };
+}
+
+/** Public submission: insert a single connection (no auth). Use when user is public. Returns created connection id. */
+export async function submitConnection(
+  mapSlug: string,
+  connection: { fromNodeId: string; toNodeId: string; description?: string },
+  options?: DataLayerOptions
+): Promise<{ id: string }> {
+  guard();
+  if (!USE_BACKEND) {
+    throw new Error('Public submission requires backend');
+  }
+  const r = await fetch(`${apiBase()}/api/maps/${encodeURIComponent(mapSlug)}/submissions/connections`, {
+    ...fetchOpts('POST', {
+      fromNodeId: connection.fromNodeId,
+      toNodeId: connection.toNodeId,
+      description: connection.description ?? '',
+    }),
+    signal: options?.signal,
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    const msg = typeof (data as { error?: string }).error === 'string' ? (data as { error: string }).error : `submitConnection: ${r.status}`;
+    throw new Error(msg);
+  }
+  const id = (data as { id?: string }).id;
+  if (!id) throw new Error('Invalid response from submit connection');
+  return { id };
+}
+
 // --- Public API: Users & session ---
 
 export async function getUsers(): Promise<User[]> {

@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { MapNode, MapConnection, NodeType, UserSession, MapTheme, SceneMap, User, AuthSession } from '../types';
 import { INITIAL_NODES, CATEGORY_COLORS, DEFAULT_ENABLED_NODE_TYPES } from '../constants';
 import { getElementLabel } from '../lib/element-config';
-import { getNodes as loadNodes, saveNodes as persistNodes, getConnections as loadConnections, saveConnections as persistConnections, getSession, getMaps, saveMaps, isAbortError } from '../lib/data';
+import { getNodes as loadNodes, saveNodes as persistNodes, getConnections as loadConnections, saveConnections as persistConnections, getSession, getMaps, saveMaps, isAbortError, submitNode as submitNodeApi, submitConnection as submitConnectionApi, USE_BACKEND } from '../lib/data';
 import { normalizeWebsiteUrl } from '../lib/url';
 import Map from './Map';
 import Sidebar from './Sidebar';
@@ -108,6 +108,8 @@ const MapExperience: React.FC<MapExperienceProps> = ({
   const [isJoinOpen, setIsJoinOpen] = useState(false);
   const [joinPassword, setJoinPassword] = useState('');
   const [joinError, setJoinError] = useState<string | null>(null);
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
@@ -384,49 +386,118 @@ const MapExperience: React.FC<MapExperienceProps> = ({
     setPendingNode(nodeData);
     setIsSubmissionOpen(false);
     setSubmissionPresetKind(null);
+    setSubmissionError(null);
     setSelectedNodes([]);
     setPopupAnchor(null);
   };
 
   const handleSubmitConnection = useCallback(
-    (partial: Partial<MapConnection>) => {
-      const connection: MapConnection = {
-        id: Math.random().toString(36).slice(2, 11),
-        fromNodeId: partial.fromNodeId!,
-        toNodeId: partial.toNodeId!,
-        description: partial.description ?? '',
-        collaboratorId: userSession.name,
-        status: (partial.status as MapConnection['status']) ?? (userSession.role === 'public' ? 'pending' : 'approved'),
-      };
-      const next = [...connections, connection];
-      saveConnections(next);
-      setIsSubmissionOpen(false);
+    async (partial: Partial<MapConnection>) => {
+      const fromNodeId = partial.fromNodeId!;
+      const toNodeId = partial.toNodeId!;
+      const description = partial.description ?? '';
+
+      const isPublicSubmit = userSession.role === 'public' && USE_BACKEND;
+
+      if (isPublicSubmit) {
+        if (isSubmitting) return;
+        setIsSubmitting(true);
+        setSubmissionError(null);
+        try {
+          const { id } = await submitConnectionApi(effectiveSlug, {
+            fromNodeId,
+            toNodeId,
+            description,
+          });
+          const connection: MapConnection = {
+            id,
+            fromNodeId,
+            toNodeId,
+            description,
+            collaboratorId: 'Public',
+            status: 'pending',
+          };
+          const next = [...connections, connection];
+          setConnections(next);
+          connectionsRef.current = next;
+          setIsSubmissionOpen(false);
+        } catch (err) {
+          setSubmissionError(err instanceof Error ? err.message : 'Could not submit connection. Please try again.');
+        } finally {
+          setIsSubmitting(false);
+        }
+      } else {
+        const connection: MapConnection = {
+          id: Math.random().toString(36).slice(2, 11),
+          fromNodeId,
+          toNodeId,
+          description,
+          collaboratorId: userSession.name,
+          status: (partial.status as MapConnection['status']) ?? (userSession.role === 'public' ? 'pending' : 'approved'),
+        };
+        const next = [...connections, connection];
+        saveConnections(next);
+        setIsSubmissionOpen(false);
+      }
     },
-    [connections, userSession.name, userSession.role, saveConnections],
+    [connections, userSession.name, userSession.role, saveConnections, effectiveSlug, isSubmitting],
   );
 
   // Finalizes node creation upon map click
-  const handleMapClick = (x: number, y: number, ev?: { clientX: number; clientY: number }) => {
-    if (pendingNode) {
+  const handleMapClick = async (x: number, y: number, ev?: { clientX: number; clientY: number }) => {
+    if (!pendingNode || isSubmitting) return;
+
+    const nodeData: Omit<MapNode, 'id' | 'collaboratorId' | 'status'> = {
+      type: (pendingNode.type || NodeType.EVENT) as MapNode['type'],
+      title: pendingNode.title || 'Untitled',
+      description: pendingNode.description || '',
+      website: pendingNode.website || '',
+      x,
+      y,
+      tags: pendingNode.tags || [],
+      primaryTag: pendingNode.primaryTag || 'other',
+    };
+
+    const isPublicSubmit = userSession.role === 'public' && USE_BACKEND;
+
+    if (isPublicSubmit) {
+      setIsSubmitting(true);
+      setSubmissionError(null);
+      try {
+        const { id } = await submitNodeApi(effectiveSlug, nodeData);
+        const node: MapNode = {
+          ...nodeData,
+          id,
+          collaboratorId: 'Public',
+          status: 'pending',
+        };
+        const newNodes = [...nodes, node];
+        setNodes(newNodes);
+        nodesRef.current = newNodes;
+        setPendingNode(null);
+
+        if (typeof window !== 'undefined' && ev) {
+          import('canvas-confetti').then(({ default: confetti }) => {
+            const origin = { x: ev.clientX / window.innerWidth, y: ev.clientY / window.innerHeight };
+            confetti({ origin, particleCount: 50, spread: 60, startVelocity: 30, decay: 0.9 });
+          });
+        }
+      } catch (err) {
+        setSubmissionError(err instanceof Error ? err.message : 'Could not submit. Please try again.');
+      } finally {
+        setIsSubmitting(false);
+      }
+    } else {
       const node: MapNode = {
+        ...nodeData,
         id: crypto.randomUUID(),
-        type: pendingNode.type || NodeType.EVENT,
-        title: pendingNode.title || 'Untitled',
-        description: pendingNode.description || '',
-        website: pendingNode.website || '',
-        x: x,
-        y: y,
-        tags: pendingNode.tags || [],
-        primaryTag: pendingNode.primaryTag || 'other',
         collaboratorId: userSession.name,
         status: userSession.role === 'public' ? 'pending' : 'approved',
       };
-
       const newNodes = [...nodes, node];
       saveNodes(newNodes);
       setPendingNode(null);
 
-      // Confetti from node position (fades within ~2s)
       if (typeof window !== 'undefined' && ev) {
         import('canvas-confetti').then(({ default: confetti }) => {
           const origin = { x: ev.clientX / window.innerWidth, y: ev.clientY / window.innerHeight };
@@ -917,6 +988,22 @@ const MapExperience: React.FC<MapExperienceProps> = ({
         </div>
       )}
 
+      {/* Submission error banner */}
+      {submissionError && (
+        <div className="absolute top-20 md:top-24 left-1/2 -translate-x-1/2 z-[60] px-4 max-w-md">
+          <div className="bg-amber-100 border-2 border-amber-500 text-amber-900 px-4 py-3 rounded-xl solarpunk-shadow flex items-center gap-3">
+            <span className="text-sm font-medium flex-1">{submissionError}</span>
+            <button
+              onClick={() => setSubmissionError(null)}
+              className="shrink-0 p-1 rounded-lg hover:bg-amber-200 text-amber-800 font-bold"
+              aria-label="Dismiss"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Join as collaborator modal — safe area insets for notches/home indicator */}
       {isJoinOpen && (
         <div
@@ -1179,6 +1266,7 @@ const MapExperience: React.FC<MapExperienceProps> = ({
         }
         onAddNode={(category) => {
           setSubmissionPresetKind(category);
+          setSubmissionError(null);
           setIsSubmissionOpen(true);
         }}
         elementConfig={map?.elementConfig}
