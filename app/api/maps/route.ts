@@ -83,9 +83,12 @@ export async function POST(request: NextRequest) {
     }));
 
     // Fetch existing maps (by id) to diff invited emails and check admin permission.
-    // Use ensureUuid so we never pass a non-UUID to Postgres (avoids 500 when client sends old short ids).
+    // Only process maps the user can edit: new maps (creator adds self to adminIds) or existing maps where user is admin.
+    // The client may include "viewed-only" maps (from Your Maps) — skip those instead of rejecting the whole request.
     const existingById: Record<string, { invitedAdminEmails: string[]; invitedCollaboratorEmails: string[]; adminIds?: string[] }> = {};
-    for (const m of maps) {
+    const mapsToUpsert: { map: SceneMap; rawIndex: number }[] = [];
+    for (let i = 0; i < maps.length; i++) {
+      const m = maps[i];
       const mapId = ensureUuid(m.id);
       const { data: existing } = await supabase
         .from('maps')
@@ -99,21 +102,27 @@ export async function POST(request: NextRequest) {
           adminIds: (existing as { admin_ids?: string[] }).admin_ids ?? [],
         };
         if (!isMapAdmin(existing, userId)) {
-          return NextResponse.json(
-            { error: 'Only map admins can update this map' },
-            { status: 403 }
-          );
+          // User viewed this map but is not admin — skip; don't reject the whole request
+          continue;
         }
       } else {
         existingById[mapId] = { invitedAdminEmails: [], invitedCollaboratorEmails: [] };
         // New map: creator must include themselves in adminIds (client responsibility)
       }
+      mapsToUpsert.push({ map: m, rawIndex: i });
     }
 
-    const rows = maps.map((m, i) => {
+    if (mapsToUpsert.length === 0) {
+      return NextResponse.json(
+        { error: 'Only map admins can update maps' },
+        { status: 403 }
+      );
+    }
+
+    const rows = mapsToUpsert.map(({ map: m, rawIndex }) => {
       const mapId = ensureUuid(m.id);
       const row = { ...sceneMapToDbMap(m), id: mapId };
-      const raw = rawMaps[i] as SceneMap & { collaboratorPassword?: string };
+      const raw = rawMaps[rawIndex] as SceneMap & { collaboratorPassword?: string };
       if (raw?.collaboratorPassword != null && raw.collaboratorPassword !== '') {
         return { ...row, collaborator_password_hash: hashPassword(raw.collaboratorPassword) };
       }
@@ -130,7 +139,7 @@ export async function POST(request: NextRequest) {
     // Send invitation emails to newly added addresses (only when Resend is configured)
     const fromEmail = process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev';
     const hasResendKey = !!process.env.RESEND_API_KEY;
-    for (const m of maps) {
+    for (const { map: m } of mapsToUpsert) {
       const mapId = ensureUuid(m.id);
       const prev = existingById[mapId] ?? { invitedAdminEmails: [], invitedCollaboratorEmails: [] };
       const currentAdmins = normalizeEmails(m.invitedAdminEmails);
@@ -164,7 +173,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ ok: true, count: maps.length });
+    return NextResponse.json({ ok: true, count: mapsToUpsert.length });
   } catch (err) {
     console.error('POST /api/maps', err);
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });

@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/route-handler';
 import { getSupabase } from '@/lib/supabase-server';
+import { resolveInvitedEmails } from '@/lib/resolve-invites';
 
 /**
  * POST /api/auth/signup
- * Body: { name, email, password }. Creates Supabase Auth user and applies invited_admin_emails.
+ * Body: { name, email, password }. Creates Supabase Auth user and applies
+ * invited_admin_emails / invited_collaborator_emails.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -36,25 +38,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Signup failed' }, { status: 500 });
     }
 
-    // Add user to admin_ids for maps where their email is in invited_admin_emails
-    const adminSupabase = getSupabase();
-    const { data: maps } = await adminSupabase
-      .from('maps')
-      .select('id, admin_ids, invited_admin_emails');
-    const emailLower = user.email?.toLowerCase() ?? '';
-    const toUpdate: { id: string; admin_ids: string[] }[] = [];
-    for (const m of maps ?? []) {
-      const invited = (m.invited_admin_emails ?? []) as string[];
-      if (invited.some((e: string) => e.toLowerCase() === emailLower)) {
-        const adminIds = (m.admin_ids ?? []) as string[];
-        if (!adminIds.includes(user.id)) {
-          toUpdate.push({ id: m.id, admin_ids: [...adminIds, user.id] });
-        }
-      }
-    }
-    for (const { id, admin_ids } of toUpdate) {
-      await adminSupabase.from('maps').update({ admin_ids }).eq('id', id);
-    }
+    // Resolve pending admin/collaborator invitations for this user's email
+    await resolveInvitedEmails(getSupabase(), user.id, user.email ?? '');
 
     const session = {
       userId: user.id,

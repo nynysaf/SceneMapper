@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientForRouteHandler } from '@/lib/supabase/route-handler';
+import { getSupabase } from '@/lib/supabase-server';
+import { resolveInvitedEmails } from '@/lib/resolve-invites';
 
 /**
  * POST /api/auth/login
  * Body: { email, password }. Signs in via Supabase Auth; session stored in cookies.
+ * After login, resolves any pending invited_admin_emails / invited_collaborator_emails.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -27,6 +30,9 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'Login failed' }, { status: 500 });
     }
+
+    // Resolve pending admin/collaborator invitations for this user's email
+    await resolveInvitedEmails(getSupabase(), user.id, user.email ?? '');
 
     const session = {
       userId: user.id,
