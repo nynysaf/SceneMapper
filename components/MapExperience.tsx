@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { MapNode, MapConnection, NodeType, UserSession, MapTheme, SceneMap, User, AuthSession } from '../types';
 import { INITIAL_NODES, CATEGORY_COLORS, DEFAULT_ENABLED_NODE_TYPES } from '../constants';
-import { getElementLabel } from '../lib/element-config';
+import { getElementLabel, getEnabledNodeTypes } from '../lib/element-config';
 import { getNodes as loadNodes, saveNodes as persistNodes, getConnections as loadConnections, saveConnections as persistConnections, getSession, getMaps, saveMaps, isAbortError, submitNode as submitNodeApi, submitConnection as submitConnectionApi, USE_BACKEND } from '../lib/data';
 import { normalizeWebsiteUrl } from '../lib/url';
 import Map from './Map';
@@ -152,15 +152,23 @@ const MapExperience: React.FC<MapExperienceProps> = ({
   }, [mapBackgroundImageUrl]);
 
   // Derive display settings from passed map (page fetches once; no duplicate getMapBySlug)
+  // Merge elementConfig.enabled so map-level "deselected" types are respected (fixes bug where
+  // Dashboard shows a type unchecked but the map still displayed those nodes).
   useEffect(() => {
     if (map) {
       setNodeSizeScale(map.nodeSizeScale ?? 1);
       setNodeLabelFontScale(map.nodeLabelFontScale ?? 1);
       setRegionFontScale(map.regionFontScale ?? 1);
-      const enabled =
+      const baseEnabled =
         map.enabledNodeTypes && map.enabledNodeTypes.length > 0
           ? map.enabledNodeTypes
           : DEFAULT_ENABLED_NODE_TYPES;
+      // When elementConfig has explicit enabled: false for a type, exclude it (Dashboard and map view stay in sync)
+      const configEnabled = getEnabledNodeTypes(map.elementConfig ?? undefined, map.mapTemplateId);
+      const enabled =
+        map.elementConfig && Object.keys(map.elementConfig).length > 0
+          ? baseEnabled.filter((t) => configEnabled.includes(t))
+          : baseEnabled;
       setEnabledNodeTypes(enabled);
       setConnectionsEnabled(map.connectionsEnabled !== false);
       setActiveFilters((prev) => prev.filter((t) => enabled.includes(t)));
@@ -595,6 +603,8 @@ const MapExperience: React.FC<MapExperienceProps> = ({
       mapTheme?.categoryColors?.[NodeType.MEDIA] ?? CATEGORY_COLORS[NodeType.MEDIA],
   };
 
+  // Filter nodes by enabled types + active filter selection. Hidden nodes remain in `nodes`
+  // (saved); they reappear when the user re-enables that type via the filter panel.
   const filteredNodes = nodes.filter((n) => {
     if (!enabledNodeTypes.includes(n.type)) return false;
     const passFilter = activeFilters.includes(n.type);
