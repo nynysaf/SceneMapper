@@ -182,6 +182,10 @@ export interface SceneMap {
    * When true, map is shown on the home page (up to 6). When false, only on the Featured maps page.
    */
   featuredActive?: boolean;
+  /**
+   * ISO timestamp of when the current user last viewed this map. Used for "Your Maps" sorting.
+   */
+  lastViewedAt?: string;
 }
 
 /**

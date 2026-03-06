@@ -27,15 +27,26 @@ export async function GET(request: NextRequest) {
       // Your Maps: only admin, collaborator, or has viewed
       const { data: viewedRows } = await supabase
         .from('user_map_views')
-        .select('map_id')
+        .select('map_id, viewed_at')
         .eq('user_id', userId);
-      const viewedMapIds = new Set((viewedRows ?? []).map((r) => r.map_id));
+      const viewedByMapId = new Map<string, string>();
+      for (const r of viewedRows ?? []) {
+        const v = r as { map_id: string; viewed_at?: string };
+        if (v.viewed_at) viewedByMapId.set(v.map_id, v.viewed_at);
+      }
       rows = rows.filter((r) => {
         const isAdmin = Array.isArray(r.admin_ids) && r.admin_ids.includes(userId);
         const isCollaborator = Array.isArray(r.collaborator_ids) && r.collaborator_ids.includes(userId);
-        const hasViewed = viewedMapIds.has(r.id);
+        const hasViewed = viewedByMapId.has(r.id);
         return isAdmin || isCollaborator || hasViewed;
       });
+      const maps: SceneMap[] = rows.map((row) => {
+        const m = dbMapToSceneMap(row);
+        const lastViewedAt = viewedByMapId.get(row.id);
+        return lastViewedAt ? { ...m, lastViewedAt } : m;
+      });
+      const res = NextResponse.json(maps);
+      return res;
     }
     const maps: SceneMap[] = rows.map(dbMapToSceneMap);
     const res = NextResponse.json(maps);

@@ -145,7 +145,13 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, currentUser, user
                 ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {[...userMaps]
-                      .sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base' }))
+                      .sort((a, b) => {
+                        const aVal = a.lastViewedAt ?? '';
+                        const bVal = b.lastViewedAt ?? '';
+                        const cmp = bVal.localeCompare(aVal);
+                        if (cmp !== 0) return cmp;
+                        return a.title.localeCompare(b.title, undefined, { sensitivity: 'base' });
+                      })
                       .map((map) => (
                         <button
                           key={map.id}

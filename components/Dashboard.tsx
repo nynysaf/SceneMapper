@@ -239,7 +239,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [elementOrder, setElementOrder] = useState<NodeType[]>(() => [...REORDERABLE_NODE_TYPES]);
   const [elementPickerFor, setElementPickerFor] = useState<'icon' | null>(null);
   const [elementPickerTarget, setElementPickerTarget] = useState<{ type: NodeType | 'CONNECTION'; colorKey: string } | null>(null);
-  const [mapListSort, setMapListSort] = useState<'name-asc' | 'name-desc'>('name-asc');
+  const [mapListSort, setMapListSort] = useState<'recent' | 'name-asc' | 'name-desc'>('recent');
   const [copiedMapId, setCopiedMapId] = useState<string | null>(null);
   const [qrMapSlug, setQrMapSlug] = useState<string | null>(null);
   const [mapToDelete, setMapToDelete] = useState<SceneMap | null>(null);
@@ -349,8 +349,14 @@ const Dashboard: React.FC<DashboardProps> = ({
   const sortedMaps = React.useMemo(() => {
     const copy = [...maps];
     copy.sort((a, b) => {
+      if (mapListSort === 'recent') {
+        const aVal = a.lastViewedAt ?? '';
+        const bVal = b.lastViewedAt ?? '';
+        const cmp = bVal.localeCompare(aVal); // descending: most recent first
+        if (cmp !== 0) return cmp;
+      }
       const cmp = a.title.localeCompare(b.title, undefined, { sensitivity: 'base' });
-      return mapListSort === 'name-asc' ? cmp : -cmp;
+      return mapListSort === 'name-desc' ? -cmp : cmp;
     });
     return copy;
   }, [maps, mapListSort]);
@@ -690,8 +696,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     }
     // When using backend, wait for POST to complete before navigating so the
     // request is not aborted (NS_BINDING_ABORTED) when the page unloads.
-    const useBackend = typeof process !== 'undefined' && process.env.NEXT_PUBLIC_USE_BACKEND === 'true';
-    if (useBackend) {
+    if (USE_BACKEND) {
       try {
         await persistMaps(nextMaps);
       } catch (err) {
@@ -708,7 +713,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     if (oldSlug && oldSlug !== slug) {
       void copyNodesToSlug(oldSlug, slug);
     } else if (!editingMapId) {
-      if (useBackend) {
+      if (USE_BACKEND) {
         try {
           await saveNodes(slug, []);
         } catch {
@@ -1842,10 +1847,12 @@ const Dashboard: React.FC<DashboardProps> = ({
                 </h3>
                 <button
                   type="button"
-                  onClick={() => setMapListSort((s) => (s === 'name-asc' ? 'name-desc' : 'name-asc'))}
+                  onClick={() =>
+                    setMapListSort((s) => (s === 'recent' ? 'name-asc' : s === 'name-asc' ? 'name-desc' : 'recent'))
+                  }
                   className="text-[10px] font-semibold text-emerald-700 hover:text-emerald-900"
                 >
-                  {mapListSort === 'name-asc' ? 'A–Z' : 'Z–A'}
+                  {mapListSort === 'recent' ? 'Recent' : mapListSort === 'name-asc' ? 'A–Z' : 'Z–A'}
                 </button>
               </div>
               <ul className="space-y-2">

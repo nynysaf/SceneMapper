@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import type { SceneMap, MapNode, MapConnection } from '@/types';
 import { supabase } from '@/lib/supabase-server';
 import { dbMapToSceneMap, dbNodeToMapNode, dbConnectionToMapConnection } from '@/lib/db-mappers';
-import { getCurrentUserId, canAccessMap } from '@/lib/auth-api';
+import { getCurrentUserIdFromRequest, canAccessMap } from '@/lib/auth-api';
 
 type RouteContext = { params: Promise<{ slug: string }> };
 
@@ -17,7 +17,7 @@ export interface MapPageResponse {
  * Returns map, nodes, and connections in one response (Tier 3: combined API).
  * Returns 404 for private maps if user lacks access.
  */
-export async function GET(_request: NextRequest, context: RouteContext) {
+export async function GET(request: NextRequest, context: RouteContext) {
   const { slug } = await context.params;
   try {
     const { data: mapRow, error: mapError } = await supabase
@@ -35,7 +35,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
       return NextResponse.json<MapPageResponse>({ map: null, nodes: [], connections: [] }, { status: 404 });
     }
 
-    const userId = await getCurrentUserId();
+    const userId = await getCurrentUserIdFromRequest(request);
     if (!canAccessMap(mapRow, userId)) {
       return NextResponse.json<MapPageResponse>({ map: null, nodes: [], connections: [] }, { status: 404 });
     }
