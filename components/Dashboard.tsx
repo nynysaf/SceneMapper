@@ -720,7 +720,12 @@ const Dashboard: React.FC<DashboardProps> = ({
     // Initialize or migrate node collection for this map
     const oldSlug = editingOriginalSlug && editingMapId ? editingOriginalSlug : null;
     if (oldSlug && oldSlug !== slug) {
-      void copyNodesToSlug(oldSlug, slug);
+      // With backend, nodes are stored by map_id—the map was just updated in place, so nodes
+      // remain correctly linked. copyNodesToSlug would look up by old slug (now gone), get [],
+      // then overwrite with [], wiping nodes. Skip copy when editing with backend.
+      if (!USE_BACKEND) {
+        void copyNodesToSlug(oldSlug, slug);
+      }
     } else if (!editingMapId) {
       if (USE_BACKEND) {
         try {
