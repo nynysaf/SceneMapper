@@ -696,9 +696,18 @@ const Dashboard: React.FC<DashboardProps> = ({
     }
     // When using backend, wait for POST to complete before navigating so the
     // request is not aborted (NS_BINDING_ABORTED) when the page unloads.
+    // Only send the map being created or edited—sending viewed-only maps causes
+    // the API to skip them and return 403 "Only map admins can update maps".
     if (USE_BACKEND) {
       try {
-        await persistMaps(nextMaps);
+        const mapToSave = nextMaps.find((m) => m.id === targetMapId);
+        if (!mapToSave) {
+          setMapError('Could not save map. Please try again.');
+          setIsBuildingMap(false);
+          return;
+        }
+        await saveMaps([mapToSave]);
+        setMaps(nextMaps);
       } catch (err) {
         setMapError(err instanceof Error ? err.message : 'Could not save map. Please try again.');
         setIsBuildingMap(false);
