@@ -15,6 +15,7 @@ export default function HomePage() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [allMaps, setAllMaps] = useState<SceneMap[]>([]);
   const [featuredMapsAll, setFeaturedMapsAll] = useState<SceneMap[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -39,6 +40,9 @@ export default function HomePage() {
           setAllMaps([]);
           setFeaturedMapsAll([]);
         }
+      })
+      .finally(() => {
+        setIsLoading(false);
       });
     return () => ac.abort();
   }, []);
@@ -59,6 +63,7 @@ export default function HomePage() {
       userMaps={userMaps}
       featuredMaps={featuredForHome}
       showMoreFeatured={showMoreFeatured}
+      isLoading={isLoading}
     />
   );
 }

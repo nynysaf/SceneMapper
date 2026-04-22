@@ -33,9 +33,10 @@ interface LandingPageProps {
   featuredMaps?: SceneMap[];
   /** When true, show a "More" button linking to /featured-maps. */
   showMoreFeatured?: boolean;
+  isLoading?: boolean;
 }
 
-const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, currentUser, userMaps = [], featuredMaps = [], showMoreFeatured = false }) => {
+const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, currentUser, userMaps = [], featuredMaps = [], showMoreFeatured = false, isLoading = false }) => {
   const [logoError, setLogoError] = useState(false);
 
   const handleExampleHref = (href: string) => {
@@ -118,7 +119,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, currentUser, user
         </section>
 
         <section className="flex-1 w-full max-w-md space-y-6">
-          {currentUser && (
+          {(isLoading || currentUser) && (
             <div className="glass rounded-[2.5rem] p-6 md:p-8 solarpunk-shadow relative overflow-hidden">
               <div className="absolute -right-10 -top-10 w-40 h-40 bg-emerald-200 rounded-full opacity-40" />
               <div className="absolute -left-12 bottom-0 w-52 h-52 bg-sky-200 rounded-full opacity-40" />
@@ -132,7 +133,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, currentUser, user
                     Create map
                   </button>
                 </div>
-                {userMaps.length === 0 ? (
+                {isLoading ? (
+                  <div className="flex justify-center items-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+                  </div>
+                ) : userMaps.length === 0 ? (
                   <p className="text-sm text-emerald-700">
                     You haven&apos;t created any maps yet.{' '}
                     <button
@@ -143,43 +148,55 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, currentUser, user
                     </button>
                   </p>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {[...userMaps]
-                      .sort((a, b) => {
-                        const aVal = a.lastViewedAt ?? '';
-                        const bVal = b.lastViewedAt ?? '';
-                        const cmp = bVal.localeCompare(aVal);
-                        if (cmp !== 0) return cmp;
-                        return a.title.localeCompare(b.title, undefined, { sensitivity: 'base' });
-                      })
-                      .map((map) => (
-                        <button
-                          key={map.id}
-                          type="button"
-                          onClick={() => onNavigate(`/maps/${map.slug}`)}
-                          className="flex flex-col rounded-2xl overflow-hidden border-2 border-emerald-100 hover:border-emerald-300 hover:shadow-md transition-all text-left bg-white/60"
-                        >
-                          <div className="aspect-video bg-emerald-100/80 flex items-center justify-center overflow-hidden">
-                            {map.backgroundImageUrl ? (
-                              <img
-                                src={map.backgroundImageUrl}
-                                alt=""
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <span className="text-2xl font-serif text-emerald-400">map</span>
-                            )}
-                          </div>
-                          <div className="p-2 min-h-[3rem]">
-                            <span className="text-xs font-semibold text-emerald-900 line-clamp-2">
-                              {map.title}
-                            </span>
-                            <span className="text-[10px] text-emerald-600 font-medium block mt-0.5">
-                              {roleForMap(map, currentUser)}
-                            </span>
-                          </div>
-                        </button>
-                      ))}
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {[...userMaps]
+                        .sort((a, b) => {
+                          const aVal = a.lastViewedAt ?? '';
+                          const bVal = b.lastViewedAt ?? '';
+                          const cmp = bVal.localeCompare(aVal);
+                          if (cmp !== 0) return cmp;
+                          return a.title.localeCompare(b.title, undefined, { sensitivity: 'base' });
+                        })
+                        .slice(0, 6)
+                        .map((map) => (
+                          <button
+                            key={map.id}
+                            type="button"
+                            onClick={() => onNavigate(`/maps/${map.slug}`)}
+                            className="flex flex-col rounded-2xl overflow-hidden border-2 border-emerald-100 hover:border-emerald-300 hover:shadow-md transition-all text-left bg-white/60"
+                          >
+                            <div className="aspect-video bg-emerald-100/80 flex items-center justify-center overflow-hidden">
+                              {map.backgroundImageUrl ? (
+                                <img
+                                  src={map.backgroundImageUrl}
+                                  alt=""
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <span className="text-2xl font-serif text-emerald-400">map</span>
+                              )}
+                            </div>
+                            <div className="p-2 min-h-[3rem]">
+                              <span className="text-xs font-semibold text-emerald-900 line-clamp-2">
+                                {map.title}
+                              </span>
+                              <span className="text-[10px] text-emerald-600 font-medium block mt-0.5">
+                                {roleForMap(map, currentUser)}
+                              </span>
+                            </div>
+                          </button>
+                        ))}
+                    </div>
+                    <div className="pt-2">
+                      <button
+                        type="button"
+                        onClick={() => onNavigate('/dashboard')}
+                        className="text-sm font-semibold text-emerald-700 hover:text-emerald-900 underline"
+                      >
+                        View all your maps →
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -196,7 +213,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, currentUser, user
                 Explore maps built by communities.
               </p>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {featuredMaps.length === 0 ? (
+                {isLoading ? (
+                  <div className="col-span-2 sm:col-span-3 flex justify-center items-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+                  </div>
+                ) : featuredMaps.length === 0 ? (
                   <p className="text-sm text-emerald-700 col-span-2 sm:col-span-3">
                     No featured maps yet.
                   </p>
