@@ -118,7 +118,10 @@ export async function POST(request: NextRequest) {
         }
       } else {
         existingById[mapId] = { invitedAdminEmails: [], invitedCollaboratorEmails: [] };
-        // New map: creator must include themselves in adminIds (client responsibility)
+        // New map: creator must include themselves in adminIds
+        if (!Array.isArray(m.adminIds) || !m.adminIds.includes(userId)) {
+          continue;
+        }
       }
       mapsToUpsert.push({ map: m, rawIndex: i });
     }

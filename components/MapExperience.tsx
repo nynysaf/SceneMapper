@@ -290,9 +290,8 @@ const MapExperience: React.FC<MapExperienceProps> = ({
       getMaps().then((maps) => {
         const idx = maps.findIndex((m) => m.slug === effectiveSlug);
         if (idx === -1) return;
-        const updated = [...maps];
-        updated[idx] = { ...updated[idx], nodeSizeScale: value };
-        void saveMaps(updated);
+        const mapToSave = { ...maps[idx], nodeSizeScale: value };
+        void saveMaps([mapToSave]);
       });
     },
     [effectiveSlug],
@@ -304,9 +303,8 @@ const MapExperience: React.FC<MapExperienceProps> = ({
       getMaps().then((maps) => {
         const idx = maps.findIndex((m) => m.slug === effectiveSlug);
         if (idx === -1) return;
-        const updated = [...maps];
-        updated[idx] = { ...updated[idx], nodeLabelFontScale: value };
-        void saveMaps(updated);
+        const mapToSave = { ...maps[idx], nodeLabelFontScale: value };
+        void saveMaps([mapToSave]);
       });
     },
     [effectiveSlug],
@@ -318,9 +316,8 @@ const MapExperience: React.FC<MapExperienceProps> = ({
       getMaps().then((maps) => {
         const idx = maps.findIndex((m) => m.slug === effectiveSlug);
         if (idx === -1) return;
-        const updated = [...maps];
-        updated[idx] = { ...updated[idx], regionFontScale: value };
-        void saveMaps(updated);
+        const mapToSave = { ...maps[idx], regionFontScale: value };
+        void saveMaps([mapToSave]);
       });
     },
     [effectiveSlug],
